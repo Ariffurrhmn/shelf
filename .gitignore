@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets and local environment
+.env
+.env.*
+
+# Playwright caches and browsers
+.playwright/
+ms-playwright/
+playwright-report/
+test-results/
+
+# Build and thumbnail cache
+.cache/
+.shelf-cache/
+
+# site/ holds generated gallery output and is kept via site/.gitkeep (not ignored).
+# Generated output may be deployed from CI instead of committed (TBD).
