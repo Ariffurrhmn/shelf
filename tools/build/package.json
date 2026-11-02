@@ -1,0 +1,9 @@
+{
+  "name": "shelf-build-tools",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Thumbnail generation for Shelf (Playwright).",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}
