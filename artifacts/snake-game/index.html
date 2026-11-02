@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Snake",
+  "description": "Classic snake on a small grid, playable with arrow keys, swipes or on-screen buttons.",
+  "created": "2026-10-24",
+  "tool": "Claude",
+  "kind": "game",
+  "tags": ["game", "canvas", "sample"],
+  "notes": "Sample artifact. High score is not saved (storage: none). I would add speed levels."
+}
+</script>
+<style>
+  :root { color-scheme: light dark; --bg:#eef1ea; --fg:#1a2a1a; --board:#dfe7d6; --snake:#2f6b3a; --food:#c8382c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#10150f; --fg:#e6efe0; --board:#1a2318; --snake:#7bd88f; --food:#ff6b5e; } }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:16px; touch-action:manipulation; }
+  h1 { margin:0; font-size:1.2rem; }
+  canvas { width:min(92vw, 360px); aspect-ratio:1; background:var(--board); border-radius:12px; touch-action:none; }
+  .hud { display:flex; gap:20px; font-variant-numeric:tabular-nums; }
+  .pad { display:grid; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(2,56px); gap:6px; }
+  .pad button { font-size:1.4rem; border-radius:12px; border:1px solid currentColor; background:transparent; color:inherit; cursor:pointer; }
+  .pad .up { grid-column:2; } .pad .left { grid-column:1; grid-row:2; } .pad .down { grid-column:2; grid-row:2; } .pad .right { grid-column:3; grid-row:2; }
+  p { margin:0; font-size:.9rem; opacity:.75; text-align:center; }
+</style>
+</head>
+<body>
+<h1>Snake</h1>
+<div class="hud"><span>Score <b id="score">0</b></span><span>Best <b id="best">0</b></span></div>
+<canvas id="c" width="360" height="360" aria-label="Snake game board"></canvas>
+<div class="pad" aria-label="Direction buttons">
+  <button class="up" data-d="U" aria-label="Up">↑</button>
+  <button class="left" data-d="L" aria-label="Left">←</button>
+  <button class="down" data-d="D" aria-label="Down">↓</button>
+  <button class="right" data-d="R" aria-label="Right">→</button>
+</div>
+<p id="msg">Press an arrow key or swipe to start.</p>
+<script>
+(function () {
+  var N = 18, S = 360 / N, cv = document.getElementById('c'), x = cv.getContext('2d');
+  var scoreEl = document.getElementById('score'), bestEl = document.getElementById('best'), msg = document.getElementById('msg');
+  var snake, dir, next, food, score, best = 0, timer = null, alive;
+  var V = { U:[0,-1], D:[0,1], L:[-1,0], R:[1,0] };
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n); }
+  function place() {
+    do { food = [Math.floor(Math.random()*N), Math.floor(Math.random()*N)]; }
+    while (snake.some(function (s) { return s[0]===food[0] && s[1]===food[1]; }));
+  }
+  function init() {
+    snake = [[9,9],[8,9],[7,9]]; dir = next = 'R'; score = 0; alive = true; place();
+    scoreEl.textContent = 0; draw();
+  }
+  function draw() {
+    x.clearRect(0, 0, 360, 360);
+    x.fillStyle = css('--food'); x.beginPath(); x.arc(food[0]*S+S/2, food[1]*S+S/2, S*0.38, 0, 7); x.fill();
+    x.fillStyle = css('--snake');
+    snake.forEach(function (s, i) { x.globalAlpha = i === 0 ? 1 : 0.8; x.fillRect(s[0]*S+1, s[1]*S+1, S-2, S-2); });
+    x.globalAlpha = 1;
+  }
+  function step() {
+    dir = next; var h = snake[0], v = V[dir], n = [h[0]+v[0], h[1]+v[1]];
+    if (n[0]<0||n[1]<0||n[0]>=N||n[1]>=N||snake.some(function (s) { return s[0]===n[0]&&s[1]===n[1]; })) {
+      alive = false; clearInterval(timer); timer = null; msg.textContent = 'Game over. Press any direction to retry.'; return;
+    }
+    snake.unshift(n);
+    if (n[0]===food[0] && n[1]===food[1]) { score++; scoreEl.textContent = score; if (score>best) { best = score; bestEl.textContent = best; } place(); }
+    else snake.pop();
+    draw();
+  }
+  function turn(d) {
+    if (!alive) init();
+    var o = { U:'D', D:'U', L:'R', R:'L' };
+    if (d !== o[dir]) next = d;
+    if (!timer) { timer = setInterval(step, 120); msg.textContent = ''; }
+  }
+  var keys = { ArrowUp:'U', ArrowDown:'D', ArrowLeft:'L', ArrowRight:'R', w:'U', s:'D', a:'L', d:'R' };
+  document.addEventListener('keydown', function (e) { if (keys[e.key]) { e.preventDefault(); turn(keys[e.key]); } });
+  document.querySelectorAll('.pad button').forEach(function (b) { b.addEventListener('click', function () { turn(b.dataset.d); }); });
+  var sx, sy;
+  cv.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  cv.addEventListener('touchend', function (e) {
+    var dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+  }, { passive: true });
+  init();
+})();
+</script>
+</body>
+</html>
