@@ -4,8 +4,8 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `title` | string | yes | | Display name shown in the gallery. |
-| `description` | string | yes | | One line describing the artifact. |
+| `title` | string | yes | | Display name shown in the gallery (80 characters at most). |
+| `description` | string | yes | | One line describing the artifact (200 characters at most). |
 | `created` | string | yes | | Creation date as `YYYY-MM-DD`. |
 | `tool` | string | yes | | What built it (the AI tool or editor used). |
 | `kind` | string | yes | | One of `app`, `presentation`, `doc`, `game`, `other`. |
@@ -17,7 +17,7 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 
 ## Notes
 
-- Unknown fields are TBD: whether the validator rejects or ignores them has not been decided.
+- Unknown fields are ignored with a warning, so a typo such as `tgas` is visible but does not break the build.
 - `description` is a single line, no line breaks.
-- `network` entries are bare domains (for example the host part of a URL), not full URLs. The exact format will be fixed together with the validator.
+- `network` entries are bare domains (for example the host part of a URL), not full URLs. Entries with a scheme, path or port are rejected.
 - `kind: presentation` triggers the extra rules in SPEC section 8.

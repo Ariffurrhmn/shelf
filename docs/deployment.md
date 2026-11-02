@@ -1,5 +1,31 @@
 # Deployment
 
-Will cover how the generated gallery is published as static pages on a subdomain of my portfolio, using GitHub Pages or Cloudflare Pages, so that a push is a deploy.
+A push to `main` validates, builds and publishes the site to GitHub Pages. Pushes to other branches and pull requests run the same checks but do not publish.
 
-Status: TBD. The host, the subdomain, and the workflow are not decided.
+## One-time setup
+
+1. In the GitHub repository, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+2. Merge to `main`. The `Validate, build and deploy` workflow publishes the site. Its URL appears in the workflow summary, usually `https://<user>.github.io/shelf/`.
+3. Optional, for a custom domain or a subdomain of the portfolio: add a repository variable `SHELF_CNAME` (for example `shelf.example.com`), create the matching DNS record, and set the domain under **Settings → Pages**.
+
+## What the workflow does
+
+1. Runs the validator and build unit tests.
+2. Installs the Playwright Chromium browser for thumbnails.
+3. Runs `python tools/build/build.py --install`, which validates every artifact and fails the run on any error.
+4. On `main`, uploads `site/` and deploys it.
+
+## Building locally
+
+```bash
+cd gallery && npm ci && cd ..                 # once
+python tools/validate/shelf_validate.py       # validate only
+python tools/build/build.py --no-thumbnails   # build into site/
+python -m http.server 8000 --directory site   # preview at http://localhost:8000
+```
+
+For thumbnails locally, run `npm ci` in `tools/build` and `npx playwright install chromium`. Set `SHELF_CHROMIUM` to use an existing Chromium binary.
+
+## Another host
+
+`site/` is plain static files with relative URLs. Upload it to Cloudflare Pages, Netlify or any web server. No server code is needed.
