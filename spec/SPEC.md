@@ -1,6 +1,6 @@
 # Shelf artifact spec (v0)
 
-This is the set of rules an artifact must follow to be accepted by Shelf. The validator (planned, not yet written) will check these rules and fail with readable errors. Fields referenced here are defined in [METADATA.md](METADATA.md).
+This is the set of rules an artifact must follow to be accepted by Shelf. The validator (`tools/validate/shelf_validate.py`) checks these rules and fails with readable errors. Fields referenced here are defined in [METADATA.md](METADATA.md).
 
 The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules fail validation, SHOULD rules are preferences.
 
@@ -17,7 +17,10 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 - No build step. The files in the folder are exactly what gets served.
 - External scripts and stylesheets MUST come from a CDN with the exact version in the URL. `latest`, version ranges, and unversioned URLs are not allowed.
 - Remote images are not allowed unless their domains are declared in the `network` field of the metadata.
-- Which CDN hosts are acceptable is TBD and will be decided together with the validator.
+- Approved CDN hosts: `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `code.jquery.com`. Their URLs MUST contain an exact `x.y.z` version.
+- Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) are also allowed; their URLs are not versioned.
+- Any other host is rejected. Inline the code, or copy the file into the artifact folder.
+- Remote images are checked in HTML (`img`, `source`, `video`, `audio`, `iframe`) and in CSS (`url()`, `@import`).
 
 ## 3. Metadata
 
@@ -47,12 +50,14 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 ## 5. Network
 
 - The artifact MUST NOT make network requests (fetch, XHR, WebSocket, beacons, form posts to external hosts) unless the metadata lists the allowed domains in `network`.
-- Loading pinned CDN scripts (section 2) is separate from runtime requests, but the CDN host SHOULD still be listed in `network` so the artifact's external reach is visible in one place.
+- Loading pinned CDN scripts (section 2) is separate from runtime requests, but the CDN host SHOULD still be listed in `network` so the artifact's external reach is visible in one place. The validator reports a warning when it is not.
+- `network` entries are bare domains such as `api.example.com`: no scheme, path or port.
 
 ## 6. Secrets and personal data
 
 - No API keys, tokens, passwords, or other credentials anywhere in the artifact, including comments and example data.
 - No personal data (real names, email addresses, phone numbers, addresses, private documents) unless it is deliberately public and the artifact is not a draft.
+- The validator fails on credentials and on email addresses (except `example.com`, `example.org`, `example.net`, reserved test TLDs and `noreply@`), and warns on phone-number-like text. It scans every text file in the folder.
 - The repository and the deployed site are public. See [`../docs/security.md`](../docs/security.md).
 
 ## 7. Required HTML
@@ -74,8 +79,9 @@ An artifact with `kind: presentation` MUST also:
 ## 9. Drafts
 
 - `draft: true` in the metadata excludes the artifact from the build and from the public site.
+- The validator still checks drafts: most problems are reported as warnings, but metadata errors, secrets and personal data stay errors, because drafts are public in the repository.
 - Drafts still live in the repository, so they are still public on GitHub. Do not put anything in a draft that must stay private.
 
 ## Versioning
 
-This is spec v0. It will change while the validator is being designed. Changes are recorded in the git history of this file.
+This is spec v0.1. The validator now enforces it, so rule changes should change the validator and its tests in the same commit. Changes are recorded in the git history of this file.
