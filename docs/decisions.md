@@ -25,9 +25,3 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 - **Status:** decided
 - Artifacts keep no data by default (`storage: none`). Browser storage is allowed only when an artifact declares `storage: local`, and nothing is sent to a server.
 - **Why:** the repository and site are public, and an artifact should not quietly collect or leak anything.
-
-## License: all rights reserved
-
-- **Status:** decided
-- The source is publicly viewable for reference, but no permission is granted to copy, modify, distribute, or use it without written permission. See `LICENSE`.
-- **Why:** I want to keep full ownership of this work.
