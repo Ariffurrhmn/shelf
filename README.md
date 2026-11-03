@@ -12,7 +12,7 @@ Kept in one repo, checked against a spec, and published as a gallery I can open 
 
 </div>
 
-> **Status:** Early stage: scaffold and spec only, nothing implemented yet.
+> **Status:** Early stage: spec, a minimal gallery build, and a GitHub Pages deploy. Live at <https://ariffurrhmn.github.io/shelf/>. No validator or thumbnails yet.
 
 ---
 
@@ -59,7 +59,7 @@ flowchart LR
     H --> I["Deploy on push"]
 ```
 
-The validator and build script are planned. None of this is implemented yet.
+The validator and thumbnails are planned. A minimal build script and the Pages deploy exist (see [`docs/deployment.md`](docs/deployment.md)).
 
 ## 📐 The spec in brief
 
@@ -133,8 +133,8 @@ More in [`docs/security.md`](docs/security.md).
 
 - [x] Spec v0
 - [ ] Validator
-- [ ] Build script and thumbnails
-- [ ] Deploy
+- [ ] Build script and thumbnails (basic gallery build done, thumbnails pending)
+- [x] Deploy to GitHub Pages
 - [ ] First 8-12 curated artifacts, each with a short note
 - [ ] Optional, later: a publish CLI
 
@@ -142,4 +142,4 @@ More detail in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## 🚀 Getting started
 
-Not available yet.
+Run `python tools/build/build.py` to generate the gallery in `site/`, then open `site/index.html`.
