@@ -12,7 +12,7 @@ Kept in one repo, checked against a spec, and published as a gallery I can open 
 
 </div>
 
-> **Status:** Working and deployable. The spec, validator, build script, gallery and Pages workflow are implemented. It ships with three sample artifacts; replace them with real ones.
+> **Status:** Live at <https://ariffurrhmn.github.io/shelf/>. Working and deployable. The spec, validator, build script, gallery and Pages workflow are implemented. It ships with three sample artifacts; replace them with real ones.
 
 ---
 
