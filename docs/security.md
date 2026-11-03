@@ -8,11 +8,17 @@ Set `draft: true` in an artifact's metadata to exclude it from the build and fro
 
 ## Secret and personal-data scanning
 
-The validator is planned to scan every artifact for secrets (API keys, tokens, passwords) and personal data, and to fail the build when it finds something suspicious. It is not implemented yet, so until it exists, review artifacts by hand before committing. The patterns it will look for are TBD.
+The validator scans every text file in each artifact folder and fails the build when it finds:
+
+- cloud and API credentials: AWS keys, GitHub tokens, Anthropic and OpenAI-style keys, Stripe live keys, Slack tokens, Google API keys, private key blocks, JSON web tokens;
+- hard-coded assignments such as `apiKey = "..."` or `password: "..."`;
+- email addresses, except `example.com`, `example.org`, `example.net`, reserved test domains and `noreply@` addresses.
+
+Phone-number-like text produces a warning. The scan is a safety net based on patterns, not a guarantee, so still read an artifact before committing it. Secrets and email addresses are errors even in drafts.
 
 ## Sandboxed embeds
 
-Artifacts embedded in my portfolio site should go in an iframe with the `sandbox` attribute, so a buggy or misbehaving artifact cannot affect the host page. Which sandbox permissions to allow is TBD and may depend on the artifact (for example, `storage: local` artifacts need different treatment).
+Artifacts embedded in my portfolio site should go in an iframe with the `sandbox` attribute, so a buggy or misbehaving artifact cannot affect the host page. A reasonable starting point is `sandbox="allow-scripts"`, adding `allow-same-origin` only for `storage: local` artifacts and `allow-fullscreen` (with `allow="fullscreen"`) for presentations. Revisit when the portfolio embed is built.
 
 ## Ephemeral by default
 

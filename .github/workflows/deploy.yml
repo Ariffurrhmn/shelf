@@ -1,0 +1,74 @@
+name: Validate, build and deploy
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            gallery/package-lock.json
+            tools/build/package-lock.json
+
+      - name: Unit tests
+        run: |
+          python -m unittest discover -s tools/validate/tests
+          python -m unittest discover -s tools/build/tests
+
+      - name: Install Playwright browser (for thumbnails)
+        working-directory: tools/build
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Validate and build the site
+        run: python tools/build/build.py --install
+        env:
+          SHELF_CNAME: ${{ vars.SHELF_CNAME }}
+
+      - name: Upload site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Best effort: turns Pages on (Source: GitHub Actions) when the token is
+      # allowed to. If not, enable it once in Settings -> Pages.
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
+      - id: deployment
+        uses: actions/deploy-pages@v4

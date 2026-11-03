@@ -5,14 +5,14 @@
 **A personal shelf for small HTML apps, tools, and presentations.**
 Kept in one repo, checked against a spec, and published as a gallery I can open by link from anywhere.
 
-![Status](https://img.shields.io/badge/status-early%20stage-orange)
-![Implemented](https://img.shields.io/badge/implemented-spec%20only-lightgrey)
+![Status](https://img.shields.io/badge/status-deployable-green)
 ![Hosting](https://img.shields.io/badge/hosting-static%20pages-blue)
-![Planned](https://img.shields.io/badge/planned-Python%203.11%2B-informational)
+![Validator](https://img.shields.io/badge/validator-Python%20stdlib-informational)
+![UI](https://img.shields.io/badge/gallery-React%20%2B%20shadcn%2Fui-informational)
 
 </div>
 
-> **Status:** Early stage: spec, a minimal gallery build, and a GitHub Pages deploy. Live at <https://ariffurrhmn.github.io/shelf/>. No validator or thumbnails yet.
+> **Status:** Live at <https://ariffurrhmn.github.io/shelf/>. Working and deployable. The spec, validator, build script, gallery and Pages workflow are implemented. It ships with three sample artifacts; replace them with real ones.
 
 ---
 
@@ -59,7 +59,7 @@ flowchart LR
     H --> I["Deploy on push"]
 ```
 
-The validator and thumbnails are planned. A minimal build script and the Pages deploy exist (see [`docs/deployment.md`](docs/deployment.md)).
+The validator, build script and gallery are implemented. See [Getting started](#-getting-started).
 
 ## 📐 The spec in brief
 
@@ -94,23 +94,23 @@ The prompt is in [`spec/PROMPT.md`](spec/PROMPT.md). The session asks me for any
 shelf/
 ├── artifacts/   One folder per artifact: artifacts/<slug>/index.html
 ├── spec/        The spec, the metadata reference, and the paste-in prompt
+├── gallery/     The gallery UI (Vite, React, Tailwind, shadcn/ui)
 ├── tools/
-│   ├── validate/   Planned validator
-│   └── build/      Planned build script
-├── site/        Generated gallery output
+│   ├── validate/   The validator and its tests
+│   └── build/      The build script, thumbnails and tests
+├── site/        Generated output (git-ignored, built by CI)
 ├── docs/        Architecture, decisions, deployment, security, roadmap
-└── .github/     Workflows; the deploy workflow comes later
+└── .github/     The validate, build and deploy workflow
 ```
 
-## 🧰 Planned tech
+## 🧰 Tech
 
-All of this is tentative and may change:
-
-| Area | Choice | Status |
-| --- | --- | --- |
-| Validator and build script | Python 3.11+ | Tentative |
-| Thumbnails | Playwright | Tentative |
-| Hosting | GitHub Pages or Cloudflare Pages, on a subdomain of my portfolio | TBD |
+| Area | Choice |
+| --- | --- |
+| Validator and build script | Python 3.9+, standard library only |
+| Gallery UI | React, Tailwind CSS v4, shadcn/ui, built with Vite |
+| Thumbnails | Playwright (best effort) |
+| Hosting | GitHub Pages, from `main`; any static host works |
 
 Decisions are logged in [`docs/decisions.md`](docs/decisions.md).
 
@@ -119,7 +119,7 @@ Decisions are logged in [`docs/decisions.md`](docs/decisions.md).
 The repo and the site are public, so I treat everything in them as public.
 
 - 🚧 **Draft flag:** `draft: true` keeps an artifact out of the build and the site. It is still in the repo, so drafts are not private.
-- 🔎 **Secret scan:** the validator is planned to scan for secrets and personal data. Not implemented yet.
+- 🔎 **Secret scan:** the validator scans every file for credentials and email addresses and fails the build.
 - 📦 **Sandboxed embeds:** artifacts embedded in my portfolio site should go in an iframe with the `sandbox` attribute, so a buggy artifact can't affect the host page.
 - 🫥 **Ephemeral by default:** artifacts keep no data and send nothing to a server unless their metadata declares it.
 
@@ -132,9 +132,10 @@ More in [`docs/security.md`](docs/security.md).
 ## 🗺️ Roadmap
 
 - [x] Spec v0
-- [ ] Validator
-- [ ] Build script and thumbnails (basic gallery build done, thumbnails pending)
-- [x] Deploy to GitHub Pages
+- [x] Validator
+- [x] Build script and thumbnails
+- [x] Gallery and deploy workflow
+- [ ] Turn on GitHub Pages
 - [ ] First 8-12 curated artifacts, each with a short note
 - [ ] Optional, later: a publish CLI
 
@@ -142,4 +143,30 @@ More detail in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## 🚀 Getting started
 
-Run `python tools/build/build.py` to generate the gallery in `site/`, then open `site/index.html`.
+**Add an artifact**
+
+1. Paste [`spec/PROMPT.md`](spec/PROMPT.md) into an AI session and describe what you want.
+2. Save the reply as `artifacts/<slug>/index.html`.
+3. Check it: `python tools/validate/shelf_validate.py`
+4. Push. The workflow validates, builds and deploys.
+
+**Build and preview locally**
+
+```bash
+cd gallery && npm ci && cd ..
+python tools/build/build.py --no-thumbnails
+python -m http.server 8000 --directory site
+```
+
+Then open <http://localhost:8000>. Drop `--no-thumbnails` once Playwright is set up (see [`docs/deployment.md`](docs/deployment.md)).
+
+**Run the tests**
+
+```bash
+python -m unittest discover -s tools/validate/tests
+python -m unittest discover -s tools/build/tests
+```
+
+**Publish**
+
+In the repository settings, set **Pages → Source** to **GitHub Actions**, then push to `main`. Full steps are in [`docs/deployment.md`](docs/deployment.md).
