@@ -64,5 +64,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Best effort: turns Pages on (Source: GitHub Actions) when the token is
+      # allowed to. If not, enable it once in Settings -> Pages.
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
       - id: deployment
         uses: actions/deploy-pages@v4
