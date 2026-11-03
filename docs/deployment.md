@@ -1,6 +1,6 @@
 # Deployment
 
-A push to `main` validates, builds and publishes the site to GitHub Pages. Pushes to other branches and pull requests run the same checks but do not publish.
+The site is live at <https://ariffurrhmn.github.io/shelf/>. A push to `main` validates, builds and publishes it to GitHub Pages. Pushes to other branches and pull requests run the same checks but do not publish.
 
 ## One-time setup
 
