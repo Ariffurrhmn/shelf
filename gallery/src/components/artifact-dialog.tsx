@@ -2,7 +2,7 @@ import { ArrowUpRight, Check, Download, Link2 } from "lucide-react"
 import { useState } from "react"
 
 import { Thumb } from "@/components/artifact-card"
-import { installUrl } from "@/components/installable-section"
+import { installUrl } from "@/components/install-info"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"

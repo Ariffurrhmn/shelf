@@ -1,7 +1,8 @@
-import { ArrowUpRight, Download, Info } from "lucide-react"
+import { ArrowUpRight, Info } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
+import { InstallInfo } from "@/components/install-info"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { KIND_META, formatDate } from "@/lib/kinds"
@@ -33,7 +34,7 @@ export function Thumb({ artifact, className = "" }: { artifact: Artifact; classN
 export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDetails: (a: Artifact) => void }) {
   const { icon: Icon, label } = KIND_META[artifact.kind]
   return (
-    <Card className="group gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
+    <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
       <a href={artifact.url} className="block focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]" aria-label={`Open ${artifact.title}`}>
         <Thumb artifact={artifact} className="border-b" />
       </a>
@@ -48,11 +49,6 @@ export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDe
         <CardDescription className="line-clamp-2">{artifact.description}</CardDescription>
       </CardHeader>
       <CardContent className="mt-3 flex flex-wrap gap-1.5">
-        {artifact.install && (
-          <Badge variant="secondary" className="font-normal">
-            <Download aria-hidden /> Installable
-          </Badge>
-        )}
         {artifact.tags.slice(0, 4).map((t) => (
           <Badge key={t} variant="outline" className="font-normal">
             {t}
@@ -69,6 +65,7 @@ export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDe
           <Info />
         </Button>
       </CardFooter>
+      <InstallInfo artifact={artifact} />
     </Card>
   )
 }

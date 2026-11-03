@@ -38,6 +38,13 @@ PRESENTATIONS (kind = presentation)
 - Handle the keys in a keydown listener (ArrowLeft, ArrowRight, space, f/F) and use element.requestFullscreen() for fullscreen.
 - Must work offline apart from pinned CDN dependencies.
 
+INSTALLABLE APP (only if I ask for it, or answer yes when you ask)
+- Ask me once: "Should this be installable as an offline app on desktop and phone?" If yes, set "install": true in the metadata (and "color" if I name a colour).
+- Make it work with no connection: keep every asset inline, or load it from a pinned CDN (the first online visit caches it). Anything under "network" will need a connection, so handle that case gracefully.
+- Do NOT add a manifest, service worker, or icons yourself, and do not link a manifest. My build adds all of that.
+- If you use storage, prefix every key with the artifact's slug (for example "pomodoro-timer:settings"), because all artifacts share one origin.
+- Do not show your own "install" button. The gallery card already has one.
+
 SELF-CHECK
 - Before replying, check your file against every rule above.
 - After the file, add a short checklist of the rules with pass/fail, and say plainly if anything fails or you were unsure.

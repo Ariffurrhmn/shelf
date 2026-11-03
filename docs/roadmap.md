@@ -10,7 +10,7 @@ The short version is in the README. This file tracks detail.
 - [x] Gallery UI with search, kind and tag filters, details dialog, dark mode
 - [x] GitHub Pages workflow
 - [x] Three sample artifacts and one draft
-- [x] Installable artifacts (PWA): `install: true`, offline service worker, generated icons, gallery install section
+- [x] Installable artifacts (PWA): `install: true`, offline service worker, generated icons, install panel on each gallery card
 
 ## Next
 

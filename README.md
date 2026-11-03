@@ -128,7 +128,7 @@ More in [`docs/security.md`](docs/security.md).
 
 ## 📲 Install as an app
 
-Artifacts with `install: true` show up in the gallery's **Install to your device** section. Chrome, Edge and Android offer an install prompt; on iPhone and iPad use Share, then Add to Home Screen. Installed artifacts open in their own window and work offline, which is what makes the conference use case below safe. The build adds the manifest, icons and service worker; see [SPEC section 10](spec/SPEC.md).
+Artifacts with `install: true` get an **Installable app** strip at the bottom of their gallery card. Hover it (or tap it on a phone) to see what the installed app can do, where it can be installed, and an Install button. Chrome, Edge and Android offer an install prompt; on iPhone and iPad use Share, then Add to Home Screen. Installed artifacts open in their own window and work offline, which is what makes the conference use case below safe. The build adds the manifest, icons and service worker; see [SPEC section 10](spec/SPEC.md).
 
 ## 🎤 The use case
 
