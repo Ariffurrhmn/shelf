@@ -8,6 +8,12 @@ The site is live at <https://ariffurrhmn.github.io/shelf/>. A push to `main` val
 2. Merge to `main`. The `Validate, build and deploy` workflow publishes the site. Its URL appears in the workflow summary, usually `https://<user>.github.io/shelf/`.
 3. Optional, for a custom domain or a subdomain of the portfolio: add a repository variable `SHELF_CNAME` (for example `shelf.example.com`), create the matching DNS record, and set the domain under **Settings → Pages**.
 
+## Short links and the domain
+
+Short links are `<site>/<code>`. On GitHub Pages that is `https://<user>.github.io/shelf/<code>`. Setting `SHELF_CNAME` to a short domain, say `go.example.com`, gives `https://go.example.com/<code>`, which is the shortest form Shelf can offer on static hosting.
+
+After each build the workflow summary lists every short link. Before publishing, `python tools/build/shortlinks.py <slug>` prints the one an artifact will get. Set `SHELF_BASE_URL` in your shell to override the address that command prints.
+
 ## What the workflow does
 
 1. Runs the validator and build unit tests.

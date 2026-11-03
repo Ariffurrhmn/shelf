@@ -10,13 +10,14 @@ The short version is in the README. This file tracks detail.
 - [x] Gallery UI with search, kind and tag filters, details dialog, dark mode
 - [x] GitHub Pages workflow
 - [x] Three sample artifacts and one draft
+- [x] Short links: an automatic code per artifact, `links.json` for any address, copy buttons in the gallery, and the `url-shortener` artifact
 - [x] Installable artifacts (PWA): `install: true`, offline service worker, generated icons, gallery install section
 
 ## Next
 
 - [ ] Turn on GitHub Pages (Settings → Pages → GitHub Actions) and merge to `main`
 - [ ] Replace the sample artifacts with 8 to 12 real ones, each with a short note
-- [ ] Choose the final subdomain and set `SHELF_CNAME`
+- [ ] Choose the final subdomain and set `SHELF_CNAME` (also makes short links shorter, for example `go.example.com/ab3k`)
 - [ ] Generate `spec/PROMPT.md` from the spec so they cannot drift
 - [ ] Add a sandboxed-iframe snippet for the portfolio embed, once permissions are decided
 - [ ] After the first deploy, install each sample on a real iPhone and Android phone and on desktop Chrome and Safari, and confirm GitHub Pages serves `.webmanifest` correctly

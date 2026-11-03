@@ -62,6 +62,12 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 - `site/` is ignored by git and built in CI. The gallery reads `artifacts.json` at runtime.
 - **Why:** it avoids noisy diffs and merge conflicts in generated files.
 
+## Short links
+
+- **Status:** decided
+- Every published artifact gets a short link at the site root (`<site>/<code>`), and `links.json` can add short links to any `http(s)` address. Shelf generates a redirect page per code at build time. The code is derived from the slug (4 characters, no look-alike letters) unless the artifact sets `short`. Clashes fail the build; codes are never renumbered.
+- **Why:** the artifact URL (`<user>.github.io/shelf/artifacts/<slug>/`) is too long to type or put on a slide. Deriving the code from the slug needs no stored state and always gives the same answer, so a printed link cannot change by accident. Static hosting rules out server redirects, so redirect pages are the only option that keeps Shelf serverless.
+- **Trade-offs:** the visitor goes through one extra page load, there are no click statistics, and the host part of the link is as long as the host (`ariffurrhmn.github.io/shelf/`). A custom domain (`SHELF_CNAME`, for example `go.example.com`) shortens it to `go.example.com/<code>`. The `url-shortener` artifact helps write `links.json` entries but cannot publish them, because Shelf has no server.
 ## Installable artifacts (PWA)
 
 - **Status:** decided

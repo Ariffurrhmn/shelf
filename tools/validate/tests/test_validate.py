@@ -90,6 +90,15 @@ class TestMetadata(Base):
     def test_description_multiline(self):
         self.assertIn("META-DESCRIPTION", self.codes(self.check(page({"description": "a\nb"}))))
 
+    def test_short_code_accepts_valid_values(self):
+        for code in ("go", "my-talk", "talk2", "a" * 32):
+            self.assertNotIn("META-SHORT", self.codes(self.check(page({"short": code}))), code)
+        self.assertNotIn("META-UNKNOWN", self.codes(self.check(page({"short": "talk"}))))
+
+    def test_short_code_rejects_bad_values(self):
+        for code in ("a", "a" * 33, "Talk", "-talk", "talk-", "my--talk", "my_talk", "my talk", "assets", "artifacts", "", 7, None):
+            self.assertIn("META-SHORT", self.codes(self.check(page({"short": code}))), repr(code))
+
     def test_network_must_be_bare_domain(self):
         self.assertIn("META-NETWORK", self.codes(self.check(page({"network": ["https://api.example.com/x"]}))))
 

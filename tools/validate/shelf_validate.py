@@ -29,10 +29,31 @@ from urllib.parse import urlparse
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$")
 
+# Short links (docs/decisions.md, "Short links"). A short code is the path
+# segment after the site root: https://<host>/<code>. It lives next to the
+# gallery's own folders, so those names are reserved.
+SHORT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$")
+SHORT_MIN, SHORT_MAX = 2, 32
+RESERVED_SHORT = frozenset({"artifacts", "assets", "thumbnails", "index", "404"})
+
+
+def short_code_problem(code: object) -> str | None:
+    """Return why `code` cannot be a short code, or None when it is fine."""
+    if not isinstance(code, str):
+        return "must be a string"
+    if not SHORT_MIN <= len(code) <= SHORT_MAX:
+        return f"must be {SHORT_MIN} to {SHORT_MAX} characters"
+    if not SHORT_RE.match(code) or "--" in code:
+        return "may use only lowercase letters, digits and single hyphens, and must start and end with a letter or digit"
+    if code in RESERVED_SHORT:
+        return f"is reserved ({', '.join(sorted(RESERVED_SHORT))})"
+    return None
+
+
 KINDS = ("app", "presentation", "doc", "game", "other")
 STORAGE_VALUES = ("none", "local")
 REQUIRED_FIELDS = ("title", "description", "created", "tool", "kind")
-OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "install", "color")
+OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "short", "install", "color")
 KNOWN_FIELDS = REQUIRED_FIELDS + OPTIONAL_FIELDS
 
 # File names the build writes into installable artifacts; authors must not use them.
@@ -343,6 +364,8 @@ def _check_metadata(res: Result, page: _Page) -> dict | None:
         res.error("META-TYPE", '"draft" must be true or false.', line=line)
     if "notes" in data and not isinstance(data["notes"], str):
         res.error("META-TYPE", '"notes" must be a string.', line=line)
+    if "short" in data and (problem := short_code_problem(data["short"])):
+        res.error("META-SHORT", f'"short" {problem}; got {data["short"]!r}.', line=line)
     if "install" in data and not isinstance(data["install"], bool):
         res.error("META-TYPE", '"install" must be true or false.', line=line)
     if "color" in data and not (isinstance(data["color"], str) and COLOR_RE.match(data["color"])):

@@ -1,5 +1,4 @@
 import { ArrowUpRight, Check, Download, Link2 } from "lucide-react"
-import { useState } from "react"
 
 import { Thumb } from "@/components/artifact-card"
 import { installUrl } from "@/components/installable-section"
@@ -7,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { KIND_META, formatDate } from "@/lib/kinds"
+import { shortLabel, shortUrl, useCopy } from "@/lib/short-link"
 import type { Artifact } from "@/types"
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -19,19 +19,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function ArtifactDialog({ artifact, onClose }: { artifact: Artifact | null; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-
-  async function copy() {
-    if (!artifact) return
-    const abs = new URL(artifact.url, window.location.href).toString()
-    try {
-      await navigator.clipboard.writeText(abs)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } catch {
-      window.prompt("Copy this link", abs)
-    }
-  }
+  const { copied, copy } = useCopy()
 
   return (
     <Dialog open={artifact !== null} onOpenChange={(o) => !o && onClose()}>
@@ -44,6 +32,11 @@ export function ArtifactDialog({ artifact, onClose }: { artifact: Artifact | nul
             </DialogHeader>
             <Thumb artifact={artifact} className="rounded-md border" />
             <dl className="divide-y">
+              {artifact.short && (
+                <Row label="Short link">
+                  <code className="font-mono text-sm font-medium">{shortLabel(artifact)}</code>
+                </Row>
+              )}
               <Row label="Kind">{KIND_META[artifact.kind].label.replace(/s$/, "")}</Row>
               <Row label="Created">{formatDate(artifact.created)}</Row>
               <Row label="Built with">{artifact.tool}</Row>
@@ -78,8 +71,8 @@ export function ArtifactDialog({ artifact, onClose }: { artifact: Artifact | nul
               {artifact.notes && <Row label="Notes">{artifact.notes}</Row>}
             </dl>
             <DialogFooter>
-              <Button variant="outline" onClick={copy}>
-                {copied ? <Check /> : <Link2 />} {copied ? "Copied" : "Copy link"}
+              <Button variant="outline" onClick={() => copy(shortUrl(artifact))}>
+                {copied ? <Check /> : <Link2 />} {copied ? "Copied" : artifact.short ? "Copy short link" : "Copy link"}
               </Button>
               {artifact.install && (
                 <Button variant="outline" asChild>
