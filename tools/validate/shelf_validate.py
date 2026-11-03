@@ -53,8 +53,7 @@ def short_code_problem(code: object) -> str | None:
 KINDS = ("app", "presentation", "doc", "game", "other")
 STORAGE_VALUES = ("none", "local")
 REQUIRED_FIELDS = ("title", "description", "created", "tool", "kind")
-OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "short")
-OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "install", "color")
+OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "short", "install", "color")
 KNOWN_FIELDS = REQUIRED_FIELDS + OPTIONAL_FIELDS
 
 # File names the build writes into installable artifacts; authors must not use them.

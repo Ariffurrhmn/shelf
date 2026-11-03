@@ -1,5 +1,4 @@
-import { ArrowUpRight, Check, Info, Link2 } from "lucide-react"
-import { ArrowUpRight, Download, Info } from "lucide-react"
+import { ArrowUpRight, Check, Download, Info, Link2 } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"

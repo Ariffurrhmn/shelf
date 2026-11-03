@@ -1,6 +1,4 @@
-import { ArrowUpRight, Check, Link2 } from "lucide-react"
 import { ArrowUpRight, Check, Download, Link2 } from "lucide-react"
-import { useState } from "react"
 
 import { Thumb } from "@/components/artifact-card"
 import { installUrl } from "@/components/installable-section"
