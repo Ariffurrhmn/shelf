@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { ArtifactCard } from "@/components/artifact-card"
 import { ArtifactDialog } from "@/components/artifact-dialog"
+import { InstallableSection } from "@/components/installable-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -127,6 +128,8 @@ export default function App() {
             Apps, games and slide decks made with AI tools. Each one is a single HTML file you can open by link, with no sign-in.
           </p>
         </section>
+
+        {state.status === "ready" && <InstallableSection artifacts={artifacts} />}
 
         {state.status === "loading" && (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">

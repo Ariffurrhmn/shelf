@@ -4,7 +4,8 @@
 Pipeline:
   1. validate every artifact (fails the build on errors)
   2. build the gallery UI (gallery/, Vite) into the output directory
-  3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/
+  3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/,
+     and add PWA files (manifest, icons, service worker) to those with "install": true
   4. generate thumbnails (best effort, Playwright)
   5. write <out>/artifacts.json, .nojekyll and an optional CNAME
 
@@ -29,11 +30,15 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "validate"))
 import shelf_validate as sv  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pwa  # noqa: E402
+
 DEFAULT_REPO_URL = "https://github.com/ariffurrhmn/shelf"
 
 
 def make_entry(slug: str, meta: dict, has_thumbnail: bool) -> dict:
     """Normalise validated metadata into one manifest entry."""
+    install = meta.get("install") is True
     return {
         "slug": slug,
         "title": meta["title"],
@@ -47,6 +52,9 @@ def make_entry(slug: str, meta: dict, has_thumbnail: bool) -> dict:
         "notes": meta.get("notes"),
         "url": f"artifacts/{slug}/",
         "thumbnail": f"thumbnails/{slug}.jpg" if has_thumbnail else None,
+        "install": install,
+        "icon": f"artifacts/{slug}/icon-192.png" if install else None,
+        "color": (meta.get("color") or pwa.default_color(slug)) if install else None,
     }
 
 
@@ -113,6 +121,15 @@ def main(argv: list[str] | None = None) -> int:
     for r in published:
         shutil.copytree(r.path, dest_root / r.slug, ignore=shutil.ignore_patterns(".*", "__pycache__"))
     print(f"Copied {len(published)} artifact(s) to {dest_root}")
+    installable = [r for r in published if r.metadata and r.metadata.get("install") is True]
+    for r in installable:
+        try:
+            pwa.make_installable(dest_root / r.slug, r.slug, r.metadata)
+        except pwa.PwaError as exc:
+            print(f"\nBuild stopped: {r.slug} cannot be made installable: {exc}", file=sys.stderr)
+            return 1
+    if installable:
+        print(f"Made {len(installable)} artifact(s) installable: {', '.join(r.slug for r in installable)}")
 
     # 4. thumbnails
     thumbs: set[str] = set()

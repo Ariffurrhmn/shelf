@@ -15,6 +15,12 @@ export interface Artifact {
   url: string
   /** Relative URL of the thumbnail, or null when none could be generated. */
   thumbnail: string | null
+  /** True when the build made this artifact installable as a PWA. */
+  install: boolean
+  /** Relative URL of the generated app icon, when installable. */
+  icon: string | null
+  /** Theme colour of the installed app, when installable. */
+  color: string | null
 }
 
 export interface Manifest {

@@ -22,6 +22,7 @@ flowchart LR
 | Validator | `tools/validate/shelf_validate.py` | Checks one or all artifacts. Standard library only. Exit code 1 on errors. |
 | Build script | `tools/build/build.py` | Validates, builds the gallery, copies non-draft artifacts, makes thumbnails, writes `artifacts.json`. |
 | Thumbnails | `tools/build/thumbnails.cjs` | Screenshots each artifact to `site/thumbnails/<slug>.jpg`. Optional. |
+| PWA step | `tools/build/pwa.py` | For artifacts with `install: true`: writes `manifest.webmanifest`, icons and `sw.js` into the copy, and injects tags into its `index.html`. Standard library only. |
 | Gallery | `gallery/` | Vite + React + Tailwind v4 + shadcn/ui. Reads `artifacts.json`, shows search, filters and details. |
 | Deploy | `.github/workflows/deploy.yml` | Tests, builds on every push, and deploys to Pages from `main`. |
 
@@ -32,15 +33,16 @@ site/
 ├── index.html, assets/      gallery UI
 ├── artifacts.json           manifest the gallery reads
 ├── artifacts/<slug>/        copied artifact folders (drafts excluded)
+│   └── manifest.webmanifest, icon-*.png, sw.js   only when install: true
 ├── thumbnails/<slug>.jpg    optional
 └── .nojekyll, CNAME?
 ```
 
 ## Manifest (`artifacts.json`)
 
-`{ generated, repo?, artifacts: [ { slug, title, description, created, tool, kind, tags, storage, network, notes, url, thumbnail } ] }`, sorted newest first. All URLs are relative.
+`{ generated, repo?, artifacts: [ { slug, title, description, created, tool, kind, tags, storage, network, notes, url, thumbnail, install, icon, color } ] }`, sorted newest first. All URLs are relative.
 
 ## Boundaries
 
-- Artifacts are served as they are. The gallery links to them; it does not embed them.
+- Artifacts are served as they are, except the PWA files and tags the build adds when `install: true`. The gallery links to them; it does not embed them.
 - The gallery needs only the manifest, so any static host works.

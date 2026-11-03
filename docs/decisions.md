@@ -61,3 +61,10 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 - **Status:** decided
 - `site/` is ignored by git and built in CI. The gallery reads `artifacts.json` at runtime.
 - **Why:** it avoids noisy diffs and merge conflicts in generated files.
+
+## Installable artifacts (PWA)
+
+- **Status:** decided
+- An artifact opts in with `install: true`. The build, not the author, adds a manifest, generated icons and a service worker to the served copy, and injects the tags into the served `index.html`. The source file is not changed and the validator still forbids service workers in artifact code. Each artifact is its own installable app, scoped to its folder. The gallery lists them in an "Install to your device" section; its Install button opens the artifact with `#install`, which shows a one-off install prompt.
+- **Why:** it gives offline use on the room machine or phone with no server, and keeps authors out of service worker code. Injecting into the page itself (not a separate install page) is what iOS needs, because Add to Home Screen works from the page you are on.
+- **Trade-offs:** the served file differs from the source by one block. Per-artifact scopes share one origin, so storage keys must be slug-prefixed. Icons are generated patterns from the slug (stdlib PNG, no Playwright), not drawn artwork. The gallery itself is not a PWA.

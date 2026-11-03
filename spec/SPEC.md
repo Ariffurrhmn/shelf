@@ -14,7 +14,7 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 
 ## 2. Dependencies
 
-- No build step. The files in the folder are exactly what gets served.
+- No build step. The files in the folder are what gets served, with one exception: for artifacts that set `install: true`, the site build adds PWA files and tags to the served copy (section 10). The source folder is never changed.
 - External scripts and stylesheets MUST come from a CDN with the exact version in the URL. `latest`, version ranges, and unversioned URLs are not allowed.
 - Remote images are not allowed unless their domains are declared in the `network` field of the metadata.
 - Approved CDN hosts: `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `code.jquery.com`. Their URLs MUST contain an exact `x.y.z` version.
@@ -43,8 +43,9 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 ## 4. Storage
 
 - The default is `storage: none`.
-- Unless the metadata declares `storage: local`, the artifact MUST NOT use `localStorage`, `sessionStorage`, IndexedDB, cookies, or service workers.
+- Unless the metadata declares `storage: local`, the artifact MUST NOT use `localStorage`, `sessionStorage`, IndexedDB, cookies, or service workers. Artifacts never register their own service worker, even with `storage: local`; the build adds one for installable artifacts (section 10).
 - With `storage: local`, those APIs may be used, and the data stays in the visitor's own browser.
+- All artifacts are served from one origin, so they share browser storage. Prefix every key with the slug, for example `pomodoro-timer:settings`, so artifacts do not overwrite each other's data.
 - Nothing is ever sent to a server.
 
 ## 5. Network
@@ -82,6 +83,16 @@ An artifact with `kind: presentation` MUST also:
 - The validator still checks drafts: most problems are reported as warnings, but metadata errors, secrets and personal data stay errors, because drafts are public in the repository.
 - Drafts still live in the repository, so they are still public on GitHub. Do not put anything in a draft that must stay private.
 
+## 10. Installable artifacts (PWA)
+
+An artifact can be installed on a desktop or phone and keep working offline. It is opt-in.
+
+- Set `"install": true` in the metadata. Optionally set `"color"` (a hex colour such as `"#d64933"`) for the app's theme colour and icon background. The default is a colour derived from the slug.
+- The build, not the author, adds: `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and `sw.js` in the served folder, and a block before `</head>` in the served `index.html` that links the manifest, registers the service worker and shows an install prompt when the URL ends in `#install`. These file names are reserved: an installable artifact MUST NOT contain them.
+- The artifact MUST NOT link its own web app manifest or register its own service worker. The build stops if it finds a manifest link.
+- Everything in the folder is cached when the app is installed, so all assets MUST be local files or approved pinned CDN files. Approved CDN and font responses are cached the first time they load. Requests to any other domain in `network` need a connection, and the validator warns about them.
+- Each installed app is scoped to its own folder and updates when its files change (the cache name carries a content hash). A new version takes effect after the app is closed and opened again.
+
 ## Versioning
 
-This is spec v0.1. The validator now enforces it, so rule changes should change the validator and its tests in the same commit. Changes are recorded in the git history of this file.
+This is spec v0.2 (adds section 10). The validator now enforces it, so rule changes should change the validator and its tests in the same commit. Changes are recorded in the git history of this file.
