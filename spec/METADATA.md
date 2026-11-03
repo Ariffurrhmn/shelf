@@ -14,6 +14,8 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 | `network` | list of strings | no | `[]` | Domains the artifact is allowed to contact, see SPEC section 5. |
 | `draft` | boolean | no | `false` | If `true`, the artifact is excluded from the build and the public site. |
 | `notes` | string | no | | What it does, and what I would change. |
+| `install` | boolean | no | `false` | If `true`, the build makes the artifact installable as a PWA that works offline, see SPEC section 10. |
+| `color` | string | no | from slug | Hex colour such as `#d64933`: theme colour and icon background of the installed app. Only used with `install`. |
 
 ## Notes
 

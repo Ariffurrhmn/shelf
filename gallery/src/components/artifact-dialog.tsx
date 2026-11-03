@@ -1,7 +1,8 @@
-import { ArrowUpRight, Check, Link2 } from "lucide-react"
+import { ArrowUpRight, Check, Download, Link2 } from "lucide-react"
 import { useState } from "react"
 
 import { Thumb } from "@/components/artifact-card"
+import { installUrl } from "@/components/installable-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -62,6 +63,7 @@ export function ArtifactDialog({ artifact, onClose }: { artifact: Artifact | nul
                   "Makes no requests"
                 )}
               </Row>
+              {artifact.install && <Row label="Install">Installable app, works offline once installed</Row>}
               {artifact.tags.length > 0 && (
                 <Row label="Tags">
                   <span className="flex flex-wrap gap-1.5">
@@ -79,6 +81,13 @@ export function ArtifactDialog({ artifact, onClose }: { artifact: Artifact | nul
               <Button variant="outline" onClick={copy}>
                 {copied ? <Check /> : <Link2 />} {copied ? "Copied" : "Copy link"}
               </Button>
+              {artifact.install && (
+                <Button variant="outline" asChild>
+                  <a href={installUrl(artifact)}>
+                    <Download /> Install
+                  </a>
+                </Button>
+              )}
               <Button asChild>
                 <a href={artifact.url}>
                   Open <ArrowUpRight />

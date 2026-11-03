@@ -103,6 +103,34 @@ class TestMetadata(Base):
         self.assertIn("META-TYPE", self.codes(self.check(html)))
 
 
+class TestInstall(Base):
+    def test_install_ok(self):
+        res = self.check(page({"install": True, "color": "#d64933"}))
+        self.assertTrue(res.ok, [i.message for i in res.issues])
+        self.assertFalse(res.warnings)
+
+    def test_install_and_color_types(self):
+        self.assertIn("META-TYPE", self.codes(self.check(page({"install": "yes"}))))
+        for bad in ("red", "#fff", "#gggggg", 5):
+            self.assertIn("META-COLOR", self.codes(self.check(page({"color": bad}))), bad)
+
+    def test_reserved_files_collide(self):
+        res = self.check(page({"install": True}), extra={"manifest.webmanifest": "{}", "icon-192.png": "x"})
+        self.assertEqual(sum(1 for i in res.issues if i.code == "PWA-RESERVED"), 2)
+        # Not installable: the names are free to use.
+        self.assertNotIn("PWA-RESERVED", self.codes(self.check(page(), extra={"manifest.webmanifest": "{}"})))
+
+    def test_live_network_warns_but_cdn_does_not(self):
+        res = self.check(page({"install": True, "network": ["api.example.com"]}, head='<link rel="preconnect" href="https://api.example.com">'))
+        self.assertIn("PWA-OFFLINE", self.codes(res, v.WARNING))
+        res = self.check(page({"install": True, "network": ["cdn.jsdelivr.net"]}))
+        self.assertNotIn("PWA-OFFLINE", self.codes(res))
+
+    def test_service_worker_in_source_still_forbidden(self):
+        res = self.check(page({"install": True}, body="<script>navigator.serviceWorker.register('x.js')</script>"), )
+        self.assertIn("STORAGE", self.codes(res))
+
+
 class TestDependencies(Base):
     def test_pinned_cdn_ok(self):
         res = self.check(page({"network": ["cdn.jsdelivr.net", "cdnjs.cloudflare.com", "unpkg.com", "code.jquery.com"]}, head=(
