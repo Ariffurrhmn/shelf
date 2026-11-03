@@ -6,7 +6,8 @@ Pipeline:
   2. build the gallery UI (gallery/, Vite) into the output directory
   3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/
   4. generate thumbnails (best effort, Playwright)
-  5. write <out>/artifacts.json, .nojekyll and an optional CNAME
+  5. write a redirect page per short link (see shortlinks.py)
+  6. write <out>/artifacts.json, .nojekyll and an optional CNAME
 
 Usage:
     python tools/build/build.py
@@ -29,10 +30,13 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "validate"))
 import shelf_validate as sv  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import shortlinks  # noqa: E402
+
 DEFAULT_REPO_URL = "https://github.com/ariffurrhmn/shelf"
 
 
-def make_entry(slug: str, meta: dict, has_thumbnail: bool) -> dict:
+def make_entry(slug: str, meta: dict, has_thumbnail: bool, short: str | None = None) -> dict:
     """Normalise validated metadata into one manifest entry."""
     return {
         "slug": slug,
@@ -46,13 +50,17 @@ def make_entry(slug: str, meta: dict, has_thumbnail: bool) -> dict:
         "network": list(meta.get("network", [])),
         "notes": meta.get("notes"),
         "url": f"artifacts/{slug}/",
+        "short": short,
         "thumbnail": f"thumbnails/{slug}.jpg" if has_thumbnail else None,
     }
 
 
-def build_manifest(results: list[sv.Result], thumbs: set[str], repo_url: str | None) -> dict:
+def build_manifest(
+    results: list[sv.Result], thumbs: set[str], repo_url: str | None, shorts: dict[str, str] | None = None
+) -> dict:
+    shorts = shorts or {}
     entries = [
-        make_entry(r.slug, r.metadata, r.slug in thumbs)
+        make_entry(r.slug, r.metadata, r.slug in thumbs, shorts.get(r.slug))
         for r in results
         if r.ok and not r.draft and r.metadata
     ]
@@ -72,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--artifacts-dir", type=Path, default=REPO / "artifacts")
     ap.add_argument("--out", type=Path, default=REPO / "site")
+    ap.add_argument("--links", type=Path, default=shortlinks.LINKS_FILE, help="extra short links (default: links.json)")
     ap.add_argument("--skip-gallery", action="store_true", help="do not run the Vite build (writes data only)")
     ap.add_argument("--no-thumbnails", action="store_true")
     ap.add_argument("--install", action="store_true", help="run npm ci before building (CI uses this)")
@@ -91,6 +100,14 @@ def main(argv: list[str] | None = None) -> int:
     skipped = [r.slug for r in results if r.draft]
     if skipped:
         print(f"Skipping drafts: {', '.join(skipped)}")
+
+    # Short codes are planned before the slow steps so a collision fails fast.
+    try:
+        plan = shortlinks.plan_links([(r.slug, r.metadata) for r in published], shortlinks.load_links(args.links))
+    except shortlinks.ShortLinkError as exc:
+        print("\n".join(f"error: {p}" for p in exc.problems), file=sys.stderr)
+        print("\nBuild stopped: fix the short link problems above.", file=sys.stderr)
+        return 1
 
     # 2. gallery UI
     if not args.skip_gallery:
@@ -126,10 +143,23 @@ def main(argv: list[str] | None = None) -> int:
             print("warning: thumbnails were skipped; the gallery will show placeholders.", file=sys.stderr)
         thumbs = {p.stem for p in (out / "thumbnails").glob("*.jpg")} if (out / "thumbnails").is_dir() else set()
 
-    # 5. manifest and hosting files
+    # 5. short links (after the gallery build, which empties the output folder)
+    try:
+        count = shortlinks.write_redirects(out, plan)
+    except shortlinks.ShortLinkError as exc:
+        print("\n".join(f"error: {p}" for p in exc.problems), file=sys.stderr)
+        return 1
+    rows = shortlinks.describe(plan, {r.slug: r.metadata["title"] for r in published}, shortlinks.base_url())
+    print(f"\nWrote {count} short link(s):\n{shortlinks.format_table(rows)}")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary and rows:
+        with open(summary, "a", encoding="utf-8") as fh:
+            fh.write(shortlinks.format_markdown(rows))
+
+    # 6. manifest and hosting files
     gh = os.environ.get("GITHUB_REPOSITORY")
     repo_url = f"https://github.com/{gh}" if gh else DEFAULT_REPO_URL
-    manifest = build_manifest(published, thumbs, repo_url)
+    manifest = build_manifest(published, thumbs, repo_url, plan.artifacts)
     text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     (out / "artifacts.json").write_text(text, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")

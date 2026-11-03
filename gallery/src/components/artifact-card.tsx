@@ -1,10 +1,11 @@
-import { ArrowUpRight, Info } from "lucide-react"
+import { ArrowUpRight, Check, Info, Link2 } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { KIND_META, formatDate } from "@/lib/kinds"
+import { shortUrl, useCopy } from "@/lib/short-link"
 import type { Artifact } from "@/types"
 
 export function Thumb({ artifact, className = "" }: { artifact: Artifact; className?: string }) {
@@ -32,6 +33,7 @@ export function Thumb({ artifact, className = "" }: { artifact: Artifact; classN
 
 export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDetails: (a: Artifact) => void }) {
   const { icon: Icon, label } = KIND_META[artifact.kind]
+  const { copied, copy } = useCopy()
   return (
     <Card className="group gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
       <a href={artifact.url} className="block focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]" aria-label={`Open ${artifact.title}`}>
@@ -59,6 +61,15 @@ export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDe
           <a href={artifact.url}>
             Open <ArrowUpRight />
           </a>
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => copy(shortUrl(artifact))}
+          aria-label={`Copy short link for ${artifact.title}`}
+          title={copied ? "Copied" : "Copy short link"}
+        >
+          {copied ? <Check /> : <Link2 />}
         </Button>
         <Button variant="outline" size="icon" onClick={() => onDetails(artifact)} aria-label={`Details for ${artifact.title}`}>
           <Info />

@@ -13,6 +13,8 @@ export interface Artifact {
   notes?: string
   /** Relative URL of the artifact entry point, e.g. "artifacts/foo/". */
   url: string
+  /** Short code, so the short link is "<site root>/<short>". Null for older manifests. */
+  short?: string | null
   /** Relative URL of the thumbnail, or null when none could be generated. */
   thumbnail: string | null
 }

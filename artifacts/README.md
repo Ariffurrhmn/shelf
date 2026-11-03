@@ -13,7 +13,7 @@ artifacts/<slug>/index.html
 - Lowercase letters, digits, and hyphens only (`a-z`, `0-9`, `-`).
 - Starts with a letter or digit; no leading, trailing, or doubled hyphens.
 - Descriptive and short, for example `pomodoro-timer` or `kafka-intro-slides`.
-- Unique within this directory. The slug becomes part of the public URL, so rename with care.
+- Unique within this directory. The slug becomes part of the public URL, so rename with care. It also seeds the artifact's automatic short link, so renaming changes that too; set `short` in the metadata to keep a link you have already shared.
 
 ## What goes in a folder
 

@@ -44,7 +44,7 @@ Shelf has five pieces:
 | 1 | **Spec** | The rules an artifact must follow. |
 | 2 | **Paste-in prompt** | The spec written as a prompt I give any AI session, so new artifacts come out conformant. |
 | 3 | **Validator** | A CLI that checks each artifact against the spec and fails with readable errors. |
-| 4 | **Build script** | Validates, takes a screenshot of each artifact for a thumbnail, and generates the gallery. |
+| 4 | **Build script** | Validates, takes a screenshot of each artifact for a thumbnail, generates the gallery, and writes a short link for each artifact. |
 | 5 | **Deploy** | Publishes the generated site as static pages on a subdomain of my portfolio. |
 
 ```mermaid
@@ -88,16 +88,34 @@ flowchart LR
 
 The prompt is in [`spec/PROMPT.md`](spec/PROMPT.md). The session asks me for any metadata it is missing instead of guessing.
 
+## 🔗 Short links
+
+An artifact's real address is long: `<user>.github.io/shelf/artifacts/<slug>/`. Every published artifact also gets a short one that I can type or put on a slide:
+
+```text
+https://ariffurrhmn.github.io/shelf/74ng     →  the Pomodoro timer
+https://ariffurrhmn.github.io/shelf/link     →  the URL shortener (its own code: "short": "link")
+```
+
+- **Automatic:** a stable 4-character code from the slug, with no look-alike characters (no `i`, `l`, `o`, `0`, `1`). Set `"short": "kafka"` in the metadata for one you can say aloud.
+- **Any address:** `links.json` maps a code to any `http(s)` URL, which makes Shelf a general URL shortener. The [`url-shortener`](artifacts/url-shortener/index.html) artifact helps write the entries.
+- **See it before publishing:** `python tools/build/shortlinks.py <slug>`. The gallery has a copy button on every card, and each CI run lists all links in its summary.
+- **How:** Shelf is static, so the build writes a tiny redirect page per code (`/<code>/index.html`). `/<code>#4` forwards the `#4`, so a link can open slide 4. A clash between two codes fails the build; nothing is renumbered silently.
+- **Shorter still:** set `SHELF_CNAME` to a short domain such as `go.example.com` and the link becomes `go.example.com/74ng`.
+
+Details are in [`spec/METADATA.md`](spec/METADATA.md#short-links) and [`docs/decisions.md`](docs/decisions.md#short-links).
+
 ## 🗂️ Repository structure
 
 ```text
 shelf/
 ├── artifacts/   One folder per artifact: artifacts/<slug>/index.html
+├── links.json   Extra short links: "code": "https://..."
 ├── spec/        The spec, the metadata reference, and the paste-in prompt
 ├── gallery/     The gallery UI (Vite, React, Tailwind, shadcn/ui)
 ├── tools/
 │   ├── validate/   The validator and its tests
-│   └── build/      The build script, thumbnails and tests
+│   └── build/      The build script, short links, thumbnails and tests
 ├── site/        Generated output (git-ignored, built by CI)
 ├── docs/        Architecture, decisions, deployment, security, roadmap
 └── .github/     The validate, build and deploy workflow
@@ -135,6 +153,7 @@ More in [`docs/security.md`](docs/security.md).
 - [x] Validator
 - [x] Build script and thumbnails
 - [x] Gallery and deploy workflow
+- [x] Short links
 - [ ] Turn on GitHub Pages
 - [ ] First 8-12 curated artifacts, each with a short note
 - [ ] Optional, later: a publish CLI
@@ -148,7 +167,8 @@ More detail in [`docs/roadmap.md`](docs/roadmap.md).
 1. Paste [`spec/PROMPT.md`](spec/PROMPT.md) into an AI session and describe what you want.
 2. Save the reply as `artifacts/<slug>/index.html`.
 3. Check it: `python tools/validate/shelf_validate.py`
-4. Push. The workflow validates, builds and deploys.
+4. Check the short link it will get: `python tools/build/shortlinks.py <slug>`
+5. Push. The workflow validates, builds and deploys.
 
 **Build and preview locally**
 

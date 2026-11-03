@@ -12,7 +12,7 @@ OUTPUT
 METADATA
 - In <head>, include a JSON block: <script type="application/json" id="shelf-meta"> ... </script>
 - Required fields: title, description (one line), created (YYYY-MM-DD), tool (what built this), kind (app | presentation | doc | game | other).
-- Optional fields: tags (list), storage (none | local, default none), network (list of bare domains such as api.example.com, no https://, default empty), draft (true/false), notes (what it does / what I'd change).
+- Optional fields: tags (list), storage (none | local, default none), network (list of bare domains such as api.example.com, no https://, default empty), draft (true/false), notes (what it does / what I'd change), short (a memorable short-link code: 2-32 chars, lowercase letters, digits, single hyphens; leave it out unless I ask, Shelf assigns one).
 - If I haven't given you a value for a required field, ASK ME before writing the file. Do not guess the date or the tool.
 
 HTML
