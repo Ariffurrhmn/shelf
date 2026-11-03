@@ -1,4 +1,5 @@
 import { ArrowUpRight, Check, Info, Link2 } from "lucide-react"
+import { ArrowUpRight, Download, Info } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
@@ -50,6 +51,11 @@ export function ArtifactCard({ artifact, onDetails }: { artifact: Artifact; onDe
         <CardDescription className="line-clamp-2">{artifact.description}</CardDescription>
       </CardHeader>
       <CardContent className="mt-3 flex flex-wrap gap-1.5">
+        {artifact.install && (
+          <Badge variant="secondary" className="font-normal">
+            <Download aria-hidden /> Installable
+          </Badge>
+        )}
         {artifact.tags.slice(0, 4).map((t) => (
           <Badge key={t} variant="outline" className="font-normal">
             {t}

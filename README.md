@@ -72,6 +72,7 @@ The full text is in [`spec/SPEC.md`](spec/SPEC.md). In short, an artifact:
 - 🔑 contains no API keys, tokens, or personal data;
 - 📱 has a `lang` attribute, a viewport meta tag, a title, and a layout that works at phone width;
 - 🎞️ if it is a presentation, supports arrow keys and space, `F` for fullscreen, and prints one slide per page;
+- 📲 can set `install: true` to be installed as an offline app on desktop or phone (the build adds the PWA files);
 - 🚧 can be marked `draft: true` to keep it out of the build and the public site.
 
 ## 📋 The paste-in prompt workflow
@@ -143,6 +144,10 @@ The repo and the site are public, so I treat everything in them as public.
 
 More in [`docs/security.md`](docs/security.md).
 
+## 📲 Install as an app
+
+Artifacts with `install: true` show up in the gallery's **Install to your device** section. Chrome, Edge and Android offer an install prompt; on iPhone and iPad use Share, then Add to Home Screen. Installed artifacts open in their own window and work offline, which is what makes the conference use case below safe. The build adds the manifest, icons and service worker; see [SPEC section 10](spec/SPEC.md).
+
 ## 🎤 The use case
 
 > I'm at a conference and I'm handed a room machine I've never used. My slides are an HTML presentation I made weeks ago. I don't want to sign in to anything or plug in a drive. I open a browser, go to the Shelf address, tap the presentation, and press `F`. Arrow keys move through the slides. The same link works from my phone if the room machine fails.
@@ -154,6 +159,7 @@ More in [`docs/security.md`](docs/security.md).
 - [x] Build script and thumbnails
 - [x] Gallery and deploy workflow
 - [x] Short links
+- [x] Installable artifacts (PWA) with offline use
 - [ ] Turn on GitHub Pages
 - [ ] First 8-12 curated artifacts, each with a short note
 - [ ] Optional, later: a publish CLI

@@ -15,6 +15,8 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 | `draft` | boolean | no | `false` | If `true`, the artifact is excluded from the build and the public site. |
 | `notes` | string | no | | What it does, and what I would change. |
 | `short` | string | no | automatic | Your own short-link code, for example `kafka` gives `<site>/kafka`. 2 to 32 characters: lowercase letters, digits and single hyphens, starting and ending with a letter or digit. `artifacts`, `assets`, `thumbnails`, `index` and `404` are reserved. Without it Shelf assigns a stable 4-character code. See [Short links](#short-links). |
+| `install` | boolean | no | `false` | If `true`, the build makes the artifact installable as a PWA that works offline, see SPEC section 10. |
+| `color` | string | no | from slug | Hex colour such as `#d64933`: theme colour and icon background of the installed app. Only used with `install`. |
 
 ## Notes
 

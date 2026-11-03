@@ -20,6 +20,12 @@ Phone-number-like text produces a warning. The scan is a safety net based on pat
 
 Artifacts embedded in my portfolio site should go in an iframe with the `sandbox` attribute, so a buggy or misbehaving artifact cannot affect the host page. A reasonable starting point is `sandbox="allow-scripts"`, adding `allow-same-origin` only for `storage: local` artifacts and `allow-fullscreen` (with `allow="fullscreen"`) for presentations. Revisit when the portfolio embed is built.
 
+## Shared origin and installed apps
+
+Every artifact is served from the same origin, so they share `localStorage` and the other browser storage APIs, and any artifact's script can read what another stored. Treat artifacts as mutually trusting. Prefix storage keys with the slug so they do not collide (SPEC section 4). Installed apps use the same storage as the website, not a separate copy.
+
+Service workers are added only by the build, only for artifacts with `install: true`, and each is limited to its own folder. They cache the artifact's files and approved pinned CDN files, never user data.
+
 ## Ephemeral by default
 
 Artifacts store nothing and send nothing to a server unless their metadata says otherwise (`storage: local`, or domains listed in `network`). See [../spec/SPEC.md](../spec/SPEC.md).

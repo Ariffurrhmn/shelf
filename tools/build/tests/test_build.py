@@ -9,6 +9,7 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parents[1]))
 import build  # noqa: E402
 import shortlinks as sl  # noqa: E402
+import pwa  # noqa: E402
 
 REPO = HERE.parents[3]
 
@@ -176,6 +177,88 @@ class TestShortLinkBuild(unittest.TestCase):
             (out / "taken").mkdir()
             with self.assertRaises(sl.ShortLinkError):
                 sl.write_redirects(out, plan)
+class TestPwa(unittest.TestCase):
+    def built(self, d: str, meta_extra: str = ',"install":true'):
+        root, out = Path(d) / "artifacts", Path(d) / "site"
+        artifact(root, "app-one", meta_extra)
+        rc = build.main(["--artifacts-dir", str(root), "--out", str(out), "--skip-gallery", "--no-thumbnails"])
+        return rc, root, out
+
+    def test_installable_artifact_gets_pwa_files_and_source_is_untouched(self):
+        with tempfile.TemporaryDirectory() as d:
+            before = None
+            root = Path(d) / "artifacts"
+            artifact(root, "app-one", ',"install":true,"color":"#336699"')
+            before = (root / "app-one" / "index.html").read_text()
+            out = Path(d) / "site"
+            self.assertEqual(build.main(["--artifacts-dir", str(root), "--out", str(out), "--skip-gallery", "--no-thumbnails"]), 0)
+            self.assertEqual((root / "app-one" / "index.html").read_text(), before)
+            dest = out / "artifacts" / "app-one"
+            for name in ("manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"):
+                self.assertTrue((dest / name).is_file(), name)
+            html = (dest / "index.html").read_text()
+            self.assertIn('rel="manifest"', html)
+            self.assertLess(html.index('rel="manifest"'), html.index("</head>"))
+            self.assertIn("#336699", html)
+            man = json.loads((dest / "manifest.webmanifest").read_text())
+            self.assertEqual((man["scope"], man["start_url"], man["theme_color"]), ("./", "./", "#336699"))
+            self.assertNotIn("id", man)
+            self.assertTrue((dest / "icon-512.png").read_bytes().startswith(b"\x89PNG"))
+            sw = (dest / "sw.js").read_text()
+            self.assertIn('"index.html"', sw)
+            self.assertIn('"manifest.webmanifest"', sw)
+            self.assertNotIn('"sw.js"', sw)
+            data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
+            self.assertEqual((data["install"], data["icon"], data["color"]), (True, "artifacts/app-one/icon-192.png", "#336699"))
+
+    def test_non_installable_artifact_is_served_unchanged(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, root, out = self.built(d, "")
+            self.assertEqual(rc, 0)
+            dest = out / "artifacts" / "app-one"
+            self.assertEqual((dest / "index.html").read_text(), (root / "app-one" / "index.html").read_text())
+            self.assertEqual(sorted(p.name for p in dest.iterdir()), ["index.html"])
+            data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
+            self.assertEqual((data["install"], data["icon"], data["color"]), (False, None, None))
+
+    def test_version_changes_with_content(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d)
+            (f / "index.html").write_text("a")
+            v1 = pwa.version_of(f)
+            (f / "index.html").write_text("b")
+            self.assertNotEqual(v1, pwa.version_of(f))
+            (f / "sw.js").write_text("ignored")
+            (f / "index.html").write_text("a")
+            self.assertEqual(v1, pwa.version_of(f))
+
+    def test_head_end_ignores_look_alikes_in_scripts_and_comments(self):
+        html = '<html><head><script>var s="</head>";</script><!-- </head> --><title>x</title></head><body></body></html>'
+        at = pwa.head_end_offset(html)
+        self.assertEqual(html[at:at + 7], "</head>")
+        self.assertEqual(at, html.rindex("</head>"))
+        multi = "<html>\n<head>\n<title>x</title>\n</head>\n<body></body></html>"
+        self.assertEqual(multi[pwa.head_end_offset(multi):][:7], "</head>")
+
+    def test_inject_refuses_existing_manifest_and_double_injection(self):
+        base = "<html><head>%s<title>x</title></head><body></body></html>"
+        with self.assertRaises(pwa.PwaError):
+            pwa.inject(base % '<link rel="manifest" href="m.json">', "#112233")
+        once = pwa.inject(base % "", "#112233")
+        with self.assertRaises(pwa.PwaError):
+            pwa.inject(once, "#112233")
+        self.assertEqual(once.count("<script>"), 1)
+
+    def test_existing_theme_color_is_kept(self):
+        out = pwa.inject('<html><head><meta name="theme-color" content="#000000"></head></html>', "#112233")
+        self.assertEqual(out.count("theme-color"), 1)
+
+    def test_icons_are_deterministic_valid_png(self):
+        a = pwa.icon_png(192, "slug", "#336699")
+        self.assertEqual(a, pwa.icon_png(192, "slug", "#336699"))
+        self.assertNotEqual(a, pwa.icon_png(192, "other", "#336699"))
+        self.assertTrue(a.startswith(b"\x89PNG\r\n\x1a\n") and a.endswith(b"IEND\xaeB`\x82"))
+        self.assertRegex(pwa.default_color("x"), r"^#[0-9a-f]{6}$")
 
 
 if __name__ == "__main__":

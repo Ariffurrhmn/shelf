@@ -23,6 +23,7 @@ flowchart LR
 | Build script | `tools/build/build.py` | Validates, builds the gallery, copies non-draft artifacts, makes thumbnails, writes `artifacts.json`. |
 | Short links | `tools/build/shortlinks.py` | Picks a short code per artifact, reads `links.json`, writes one redirect page per code. Also a CLI: `python tools/build/shortlinks.py [slug]`. |
 | Thumbnails | `tools/build/thumbnails.cjs` | Screenshots each artifact to `site/thumbnails/<slug>.jpg`. Optional. |
+| PWA step | `tools/build/pwa.py` | For artifacts with `install: true`: writes `manifest.webmanifest`, icons and `sw.js` into the copy, and injects tags into its `index.html`. Standard library only. |
 | Gallery | `gallery/` | Vite + React + Tailwind v4 + shadcn/ui. Reads `artifacts.json`, shows search, filters and details. |
 | Deploy | `.github/workflows/deploy.yml` | Tests, builds on every push, and deploys to Pages from `main`. |
 
@@ -34,6 +35,7 @@ site/
 ├── artifacts.json           manifest the gallery reads
 ├── artifacts/<slug>/        copied artifact folders (drafts excluded)
 ├── <code>/index.html        one redirect page per short link
+│   └── manifest.webmanifest, icon-*.png, sw.js   only when install: true
 ├── thumbnails/<slug>.jpg    optional
 └── .nojekyll, CNAME?
 ```
@@ -47,8 +49,9 @@ site/
 Static hosting cannot answer a request with a redirect, so each short link is a folder with a tiny `index.html`. It sends the visitor on with JavaScript (carrying `?query` and `#hash`, so `/pdhh#4` opens slide 4) and has a `<meta http-equiv="refresh">` inside `<noscript>` as a fallback. Targets of artifact links are relative (`../artifacts/<slug>/`), so they work from any host or sub-path. The page is served as `/<code>/` after the host adds the slash, and the script also works if the host serves it at `/<code>`.
 
 The plan is made right after validation and before the slow gallery build, so a code clash fails the build in seconds. The redirect pages are written after the gallery build, which empties `site/`.
+`{ generated, repo?, artifacts: [ { slug, title, description, created, tool, kind, tags, storage, network, notes, url, thumbnail, install, icon, color } ] }`, sorted newest first. All URLs are relative.
 
 ## Boundaries
 
-- Artifacts are served as they are. The gallery links to them; it does not embed them.
+- Artifacts are served as they are, except the PWA files and tags the build adds when `install: true`. The gallery links to them; it does not embed them.
 - The gallery needs only the manifest, so any static host works.

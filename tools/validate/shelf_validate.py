@@ -54,7 +54,12 @@ KINDS = ("app", "presentation", "doc", "game", "other")
 STORAGE_VALUES = ("none", "local")
 REQUIRED_FIELDS = ("title", "description", "created", "tool", "kind")
 OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "short")
+OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "install", "color")
 KNOWN_FIELDS = REQUIRED_FIELDS + OPTIONAL_FIELDS
+
+# File names the build writes into installable artifacts; authors must not use them.
+PWA_RESERVED_FILES = ("sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png")
+COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # CDN hosts whose URLs must carry an exact version.
 ALLOWED_CDN_HOSTS = (
@@ -362,6 +367,10 @@ def _check_metadata(res: Result, page: _Page) -> dict | None:
         res.error("META-TYPE", '"notes" must be a string.', line=line)
     if "short" in data and (problem := short_code_problem(data["short"])):
         res.error("META-SHORT", f'"short" {problem}; got {data["short"]!r}.', line=line)
+    if "install" in data and not isinstance(data["install"], bool):
+        res.error("META-TYPE", '"install" must be true or false.', line=line)
+    if "color" in data and not (isinstance(data["color"], str) and COLOR_RE.match(data["color"])):
+        res.error("META-COLOR", f'"color" must be a hex colour such as "#d64933"; got {data["color"]!r}.', line=line)
     return data
 
 
@@ -533,6 +542,28 @@ def _check_behaviour(res: Result, files: dict[str, str], meta: dict) -> None:
                     break
 
 
+def _check_install(res: Result, root: Path, meta: dict) -> None:
+    """Rules for artifacts that opt in to being installed as a PWA (SPEC section 10)."""
+    if meta.get("install") is not True:
+        return
+    for name in PWA_RESERVED_FILES:
+        if (root / name).exists():
+            res.error(
+                "PWA-RESERVED",
+                f'"{name}" is reserved: the build generates it for installable artifacts. Remove or rename it.',
+                file=name,
+            )
+    net = meta.get("network", [])
+    if isinstance(net, list):
+        live = [n for n in net if isinstance(n, str) and n.lower() not in ALLOWED_CDN_HOSTS + ALLOWED_FONT_HOSTS]
+        if live:
+            res.warn(
+                "PWA-OFFLINE",
+                f"Installable, but requests to {', '.join(live)} need a connection; the app only works offline "
+                "where it handles that. Pinned CDN files are cached after the first online visit.",
+            )
+
+
 def _check_secrets(res: Result, files: dict[str, str]) -> None:
     for fname, text in files.items():
         for pat, label in SECRET_PATTERNS:
@@ -632,6 +663,7 @@ def validate_artifact(path: str | Path) -> Result:
         net = meta.get("network", [])
         network = [n.lower() for n in net if isinstance(n, str)] if isinstance(net, list) else []
         _check_behaviour(res, files, meta)
+        _check_install(res, root, meta)
         if meta.get("kind") == "presentation":
             _check_presentation(res, files, page)
     _check_refs(res, page, network, root)
