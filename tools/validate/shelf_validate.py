@@ -59,7 +59,7 @@ WHY_MAX = 400
 REQUIRED_FIELDS = ("title", "description", "created", "tool", "kind")
 OPTIONAL_FIELDS = (
     "tags", "storage", "network", "draft", "notes", "short", "install", "color",
-    "featured", "status", "why", "updated", "source", "thumbnail", "aliases",
+    "featured", "status", "why", "updated", "source", "thumbnail", "aliases", "icon",
 )
 KNOWN_FIELDS = REQUIRED_FIELDS + OPTIONAL_FIELDS
 
@@ -444,6 +444,14 @@ def _check_optional_metadata(res: Result, data: dict, line: int) -> None:
                 f'"thumbnail" must be a plain file name ending in {", ".join(THUMBNAIL_SUFFIXES)} (no folders); got {t!r}.',
                 line=line,
             )
+    if "icon" in data:
+        t = data["icon"]
+        if not isinstance(t, str) or not t.strip():
+            res.error("META-TYPE", '"icon" must be a file name inside the artifact folder.', line=line)
+        elif "/" in t or "\\" in t or t.startswith(".") or not t.lower().endswith(".png"):
+            res.error("META-ICON", f'"icon" must be a plain file name ending in .png (no folders); got {t!r}.', line=line)
+        elif data.get("install") is not True:
+            res.warn("META-ICON", '"icon" is only used when "install" is true.', line=line)
     if "aliases" in data:
         a = data["aliases"]
         if not isinstance(a, list) or not all(isinstance(x, str) for x in a):
@@ -646,6 +654,27 @@ def _check_install(res: Result, root: Path, meta: dict) -> None:
             )
 
 
+def _check_icon_file(res: Result, root: Path, meta: dict) -> None:
+    name = meta.get("icon")
+    if not isinstance(name, str) or "/" in name or "\\" in name or not name.lower().endswith(".png"):
+        return  # reported by the metadata rules
+    path = root / name
+    if not path.is_file():
+        res.error("META-ICON", f'"icon" file {name!r} does not exist in the artifact folder.')
+    elif path.is_symlink():
+        res.error("META-ICON", f'"icon" file {name!r} must not be a symbolic link.')
+    elif path.stat().st_size > THUMBNAIL_MAX_BYTES:
+        res.error("META-ICON", f'"icon" file {name!r} is {path.stat().st_size // 1000} KB; keep it under {THUMBNAIL_MAX_BYTES // 1000} KB.')
+    else:
+        sys_path = str(Path(__file__).resolve().parents[1] / "build")
+        if sys_path not in sys.path:
+            sys.path.insert(0, sys_path)
+        import pwa  # noqa: PLC0415 - shares the exact check the build will apply
+
+        if problem := pwa.png_problem(path.read_bytes()):
+            res.error("META-ICON", f'"icon" file {name!r} {problem}.')
+
+
 def _check_thumbnail_file(res: Result, root: Path, meta: dict) -> None:
     name = meta.get("thumbnail")
     if not isinstance(name, str) or "/" in name or "\\" in name or not name.lower().endswith(THUMBNAIL_SUFFIXES):
@@ -814,6 +843,7 @@ def validate_artifact(path: str | Path) -> Result:
         _check_behaviour(res, files, meta)
         _check_install(res, root, meta)
         _check_thumbnail_file(res, root, meta)
+        _check_icon_file(res, root, meta)
         aliases = meta.get("aliases")
         if isinstance(aliases, list) and slug in aliases:
             res.error("META-ALIASES", f'"aliases" contains the artifact\'s own slug {slug!r}.')

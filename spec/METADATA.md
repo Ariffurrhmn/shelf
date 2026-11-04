@@ -17,6 +17,7 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 | `short` | string | no | automatic | Your own short-link code, for example `kafka` gives `<site>/kafka`. 2 to 32 characters: lowercase letters, digits and single hyphens, starting and ending with a letter or digit. `artifacts`, `assets`, `thumbnails`, `index` and `404` are reserved. Without it Shelf assigns a stable 4-character code. See [Short links](#short-links). |
 | `install` | boolean | no | `false` | If `true`, the build makes the artifact installable as a PWA that works offline, see SPEC section 10. |
 | `color` | string | no | from slug | Hex colour such as `#d64933`: theme colour and icon background of the installed app. Only used with `install`. |
+| `icon` | string | no | generated pattern | A plain file name in the artifact folder: a square PNG, 512x512 or larger (8-bit RGB or RGBA, up to 2 MB), used as the installed app's home-screen icon. Draw it full-bleed with the artwork in the middle 80% so phones can round or crop it. Only used with `install`. The build scales it to 192 and 512 pixels. |
 | `featured` | boolean | no | `false` | Shows the artifact in the gallery's Featured strip. Nothing is featured unless you set this. |
 | `status` | string | no | | `experiment` or `finished`. Shown on cards when set. |
 | `why` | string | no | | Why it was made, 400 characters at most. Shown in the details view. |

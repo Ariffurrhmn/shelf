@@ -28,6 +28,7 @@ METADATA
   - short: a memorable short-link code (2-32 chars: lowercase letters, digits, single hyphens). Leave it out unless I ask.
   - install: true/false (default false). Ask me if it should be installable as an offline app. If true, keep every asset local or on a pinned CDN and prefix any storage keys with the slug.
   - color: hex such as #3563e9, only together with install.
+  - icon: file name of a square 512x512 PNG for the installed app's icon. Leave it out; the owner supplies artwork (or Shelf draws a pattern).
 - If I haven't given you a value for a required field, ASK ME before writing the file. Do not guess the date or the tool.
 
 HTML

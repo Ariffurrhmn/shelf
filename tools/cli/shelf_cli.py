@@ -398,6 +398,12 @@ def cmd_add(args: argparse.Namespace) -> int:
     if old_meta and not base.get("updated") and (old_meta.get("created") or "") <= dt.date.today().isoformat():
         optional["updated"] = dt.date.today().isoformat()  # replacing an existing artifact is an update
     meta.update({k: v for k, v in optional.items() if v not in (None, [], "")})
+    if args.icon:
+        ico = Path(args.icon)
+        if not ico.is_file() or ico.suffix.lower() != ".png":
+            raise ShelfError("--icon must be an existing square .png file of at least 512x512 pixels.")
+        meta["icon"] = "icon.png"
+        meta["install"] = True
     if args.thumbnail:
         img = Path(args.thumbnail)
         if not img.is_file() or img.suffix.lower() not in sv.THUMBNAIL_SUFFIXES:
@@ -428,6 +434,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         (staged / "index.html").write_text(upsert_meta_block(html_out, meta), encoding="utf-8")
         if args.thumbnail:
             shutil.copy2(args.thumbnail, staged / meta["thumbnail"])
+        if args.icon:
+            shutil.copy2(args.icon, staged / "icon.png")
 
         result = sv.validate_artifact(staged)
         print(sv._format([result], color=sys.stdout.isatty()))
@@ -980,6 +988,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--short", help="your own short-link code")
     a.add_argument("--thumbnail", help="use this image as the thumbnail instead of a screenshot")
     a.add_argument("--install", action="store_true", help="make it installable as an offline app")
+    a.add_argument("--icon", help="square PNG (512x512 or larger) for the installed app's icon; implies --install")
     a.add_argument("--featured", action="store_true")
     a.add_argument("--draft", action="store_true", help="keep it off the public site for now")
     a.add_argument("--fix", action="store_true", help='add a missing lang attribute and viewport meta tag')

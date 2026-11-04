@@ -29,7 +29,7 @@ It is a personal project, built for one author. It is not a platform: no account
 - **Short, permanent links.** Every artifact lives at a 4-character address like `…/shelf/74ng` (add `#3` for slide 3). Renamed artifacts keep their old addresses, and a CI check fails if a published link would stop working.
 - **A one-click brief for any AI.** The **Spec + prompt** button in the header copies the prompt, the full spec and the metadata reference, ready to paste into Claude or ChatGPT.
 - **Sharing that looks right.** Open Graph and Twitter cards on every artifact address, a social preview image, sitemap and robots.
-- **Installable apps.** Mark an artifact `install: true` and it becomes an offline app on desktop or phone.
+- **Installable apps.** Mark an artifact `install: true` and it becomes an offline app on desktop or phone, with its own icon (`icon.png`), a Home Screen name, and no browser bar. See [Put an artifact on your phone](#put-an-artifact-on-your-phone).
 - **Safer by default.** A browser-enforced network policy per artifact, secret scanning, request-limited screenshots, least-privilege CI. See [Security](#security-and-its-limits) for what is *not* covered.
 
 <p align="center">
@@ -89,6 +89,18 @@ The full walkthrough, all flags and troubleshooting are in [`docs/ai-workflow.md
 
 `shelf` never pushes or deploys. Publishing is a `git push` you do yourself.
 
+## Put an artifact on your phone
+
+Eight artifacts are installable: Holocron, Decision Wheel, JSON Explorer, 168 Hours, Review Queue, Pomodoro, Snake and the intro slides. Open the artifact itself (its 4-character link, for example `…/shelf/m4dw/`), then:
+
+- **Android / Chrome:** menu → *Install app* (or *Add to Home screen*).
+- **iPhone / iPad (Safari):** Share → *Add to Home Screen*.
+- **Desktop Chrome / Edge:** the install icon in the address bar.
+
+Or press **Install app** in an artifact's details dialog on the gallery, which opens it with a prompt. Once installed it opens full-screen, and works with no connection (the first visit has to be online so it can save itself).
+
+Things worth knowing: an installed app **keeps its own data on that device**, and on iPhone an app added to the Home Screen usually has storage separate from Safari, so progress ticked in one is not in the other. Pick one per device. After an update, close and reopen the app once to get the new version. To make another artifact installable: `"install": true` in its metadata (and optionally `"icon": "icon.png"`, a square 512×512 PNG, or `shelf add … --icon art.png`).
+
 ## Artifact metadata
 
 Each artifact is `artifacts/<slug>/index.html` with a JSON block in `<head>`. Five fields are required; everything else is optional, so older artifacts keep working.
@@ -118,7 +130,7 @@ Each artifact is `artifacts/<slug>/index.html` with a JSON block in `<head>`. Fi
 | `title`, `description`, `created`, `tool`, `kind` | Required. `kind` is the category: `app`, `game`, `presentation`, `doc`, `other`. |
 | `tags`, `status`, `why`, `notes`, `featured`, `updated`, `source` | Optional presentation fields. Nothing is featured unless you say so. |
 | `storage`, `network` | What the artifact uses. **Declare it honestly: the browser enforces `network`.** |
-| `install`, `color` | Installable offline app. |
+| `install`, `color`, `icon` | Installable offline app: theme colour, and your own 512×512 PNG icon (otherwise a pattern is drawn). |
 | `thumbnail` | Your own cover image (file in the folder) instead of the automatic screenshot. |
 | `short`, `aliases` | Your own short-link code; earlier slugs that must keep working. |
 | `draft` | Keep it off the public site (it is still in the public repo). |

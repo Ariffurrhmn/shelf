@@ -233,6 +233,24 @@ class AddCommand(unittest.TestCase):
         self.assertTrue((made / "thumbnail.png").is_file())
         self.assertEqual(cli.page_info((made / "index.html").read_text())["meta"]["thumbnail"], "thumbnail.png")
 
+    def test_icon_flag_copies_the_png_and_makes_the_artifact_installable(self):
+        sys.path.insert(0, str(REPO / "tools" / "build"))
+        import pwa
+
+        img = self.root / "art.png"
+        img.write_bytes(pwa.encode_png(512, 3, [bytearray(512 * 3) for _ in range(512)]))
+        self.assertEqual(self.add("--tool", "x", "--icon", str(img))[0], 0)
+        made = self.artifacts / "focus-timer"
+        self.assertTrue((made / "icon.png").is_file())
+        meta = cli.page_info((made / "index.html").read_text())["meta"]
+        self.assertEqual((meta["icon"], meta["install"]), ("icon.png", True))
+        small = self.root / "small.png"
+        small.write_bytes(pwa.encode_png(64, 3, [bytearray(64 * 3) for _ in range(64)]))
+        code, out, _ = self.add("--tool", "x", "--icon", str(small), "--slug", "second")
+        self.assertEqual(code, 1)
+        self.assertIn("at least 512", out)
+        self.assertFalse((self.artifacts / "second").exists())
+
     def test_existing_metadata_block_in_the_file_is_respected(self):
         self.src.write_text(cli.upsert_meta_block(SAMPLE, {
             "title": "From the AI", "description": "d", "created": "2026-02-02", "tool": "ChatGPT", "kind": "game", "tags": ["x"],
