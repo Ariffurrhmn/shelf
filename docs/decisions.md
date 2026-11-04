@@ -142,7 +142,8 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 ## Wording and a quieter first screen
 
 - **Status:** decided
-- The gallery says "artifact" everywhere (the repo's own word); the hero's statistics line and the footer's count/date line were removed. Result counts (for example "3 of 4 artifacts match") stay because they are feedback for search and filters.
+- The gallery says "artifact" everywhere (the repo's own word). The statistics line, the footer's count/date line and then the whole hero (eyebrow, headline, description, buttons) and the visible "Explore Shelf" title and result counter were removed at the owner's request: the page opens directly on search, filters and the artifacts.
+- What stays, visually hidden: an `h1` ("Shelf: small experiments, useful creations"), the "Explore Shelf" `h2` and the result count as a polite live region, so screen readers and search engines still get a page outline and search/filter feedback. The "Spec + prompt" button lives in the header.
 
 ## Two new ways in: clipboard and inbox
 

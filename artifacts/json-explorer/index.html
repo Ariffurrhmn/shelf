@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON Explorer</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "JSON Explorer",
+  "description": "Paste or drop JSON and explore it as a collapsible tree: search, jump to a path, copy any path or value, format, minify and sort. Nothing is uploaded or saved.",
+  "created": "2026-11-04",
+  "tool": "Claude",
+  "kind": "app",
+  "tags": ["json", "developer", "utility"],
+  "storage": "none",
+  "notes": "Everything runs in this page and nothing is stored, so it is safe for data you would rather not send anywhere. Big files stay fast because only the first 100 children of any node are drawn until you ask for more. Numbers beyond 2^53 lose precision, as they do in every browser's JSON.parse."
+}
+</script>
+<style>
+  :root { color-scheme: light dark; --bg:#f7f7f4; --card:#fff; --ink:#1c1d1f; --muted:#62666d; --line:#dcdde0; --accent:#2f6fed; --field:#fbfbfa; --key:#1c1d1f; --str:#1a7f4b; --num:#1f5fd1; --bool:#8a3ffc; --nul:#7a7f87; --hit:#ffe58a; --hitink:#1c1d1f; --err:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#131416; --card:#1b1c1f; --ink:#ececee; --muted:#9aa0a8; --line:#2e3035; --accent:#6ea0ff; --field:#151618; --key:#ececee; --str:#5fd49a; --num:#7aa8ff; --bool:#c19bff; --nul:#8a9099; --hit:#6b5b10; --hitink:#fff; --err:#ff8a80; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; padding:16px; }
+  h1 { margin:0; font-size:1.3rem; }
+  .top { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin-bottom:12px; }
+  .top p { margin:0; color:var(--muted); font-size:.88rem; }
+  .bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  button, input, textarea { font:inherit; color:inherit; }
+  .b { min-height:36px; padding:0 12px; border:1px solid var(--line); background:var(--card); border-radius:9px; cursor:pointer; font-size:.88rem; }
+  .b:hover { border-color:var(--accent); }
+  .b.p { background:var(--accent); border-color:var(--accent); color:#fff; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .cols { display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:12px; align-items:start; }
+  @media (max-width:860px) { .cols { grid-template-columns:1fr; } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .panel h2 { margin:0; padding:10px 14px; font-size:.78rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:8px; }
+  textarea#src { display:block; width:100%; height:min(62vh,560px); border:0; padding:12px 14px; background:var(--field); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; resize:vertical; tab-size:2; }
+  textarea#src.drag { outline:3px dashed var(--accent); outline-offset:-6px; }
+  .status { padding:8px 14px; font-size:.84rem; border-top:1px solid var(--line); color:var(--muted); min-height:2.4rem; }
+  .status.err { color:var(--err); } .status pre { margin:6px 0 0; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .find { display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px; border-bottom:1px solid var(--line); }
+  .find input { flex:1 1 150px; min-width:0; min-height:36px; border:1px solid var(--line); border-radius:9px; padding:0 10px; background:var(--field); }
+  .find .n { align-self:center; font-size:.82rem; color:var(--muted); min-width:7ch; }
+  #tree { margin:0; padding:8px 4px 12px; list-style:none; max-height:min(66vh,620px); overflow:auto; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .r { display:flex; align-items:baseline; gap:4px; padding:1px 8px 1px calc(8px + var(--d) * 18px); border-radius:6px; cursor:default; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .r:hover { background:rgba(128,128,128,.1); } .r[tabindex="0"]:focus-visible { outline-offset:-2px; }
+  .r.sel { background:rgba(47,111,237,.14); }
+  .tg { width:1.2em; flex:none; color:var(--muted); user-select:none; } .k { color:var(--key); font-weight:600; }
+  .s { color:var(--str); } .n { } .nu { color:var(--num); } .bo { color:var(--bool); } .nl { color:var(--nul); font-style:italic; } .cnt { color:var(--muted); font-size:.85em; }
+  mark { background:var(--hit); color:var(--hitink); border-radius:3px; }
+  .acts { margin-left:auto; display:flex; gap:4px; opacity:0; } .r:hover .acts, .r:focus-within .acts, .r.sel .acts { opacity:1; }
+  .acts button { font:11px system-ui,sans-serif; border:1px solid var(--line); background:var(--card); border-radius:6px; padding:1px 7px; cursor:pointer; }
+  .more { color:var(--accent); cursor:pointer; background:none; border:0; padding:0 8px 0 calc(26px + var(--d) * 18px); text-align:left; font:12px system-ui,sans-serif; }
+  .pathbar { display:flex; gap:6px; align-items:center; padding:8px 12px; border-top:1px solid var(--line); font-size:.84rem; }
+  .pathbar code { flex:1; min-width:0; overflow:auto; white-space:nowrap; padding:4px 8px; background:var(--field); border-radius:6px; font:12px ui-monospace,Menlo,Consolas,monospace; }
+  .stats { color:var(--muted); font-size:.8rem; padding:0 14px 10px; }
+  .empty { padding:30px 16px; color:var(--muted); text-align:center; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  @media (max-width:520px) { .acts { opacity:1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>JSON Explorer</h1><p>Runs in your browser. Nothing is uploaded or saved.</p></div>
+  <div class="bar" role="toolbar" aria-label="Actions">
+    <button class="b p" id="sample" type="button">Load sample</button>
+    <button class="b" id="paste" type="button">Paste from clipboard</button>
+    <label class="b" style="display:inline-flex;align-items:center;cursor:pointer">Open file…<input id="file" type="file" accept=".json,application/json,text/plain" class="sr"></label>
+    <button class="b" id="fmt" type="button">Format</button>
+    <button class="b" id="min" type="button">Minify</button>
+    <button class="b" id="sort" type="button">Sort keys</button>
+    <button class="b" id="copy" type="button">Copy</button>
+    <button class="b" id="clear" type="button">Clear</button>
+  </div>
+  <div class="cols">
+    <section class="panel" aria-label="JSON input">
+      <h2><span>Input</span><span id="size"></span></h2>
+      <label class="sr" for="src">JSON text</label>
+      <textarea id="src" spellcheck="false" placeholder="Paste JSON here, or drop a .json file anywhere on this box."></textarea>
+      <div class="status" id="status" role="status"></div>
+    </section>
+    <section class="panel" aria-label="Tree">
+      <h2><span>Tree</span><span id="stats"></span></h2>
+      <div class="find" role="search">
+        <input id="q" type="search" placeholder="Find a key or value" aria-label="Find a key or value" autocomplete="off">
+        <button class="b" id="prev" type="button" aria-label="Previous match">↑</button>
+        <button class="b" id="next" type="button" aria-label="Next match">↓</button>
+        <span class="n" id="qn" aria-live="polite"></span>
+        <button class="b" id="expand" type="button">Expand all</button>
+        <button class="b" id="collapse" type="button">Collapse</button>
+      </div>
+      <ul id="tree" role="tree" aria-label="JSON tree"></ul>
+      <div class="pathbar"><span>Path</span><code id="path">$</code>
+        <button class="b" id="cpath" type="button">Copy path</button><button class="b" id="cval" type="button">Copy value</button></div>
+      <div class="pathbar"><label for="goto">Go to</label><input id="goto" style="flex:1;min-width:0;min-height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--field)" placeholder='$.users[0].name' autocomplete="off" spellcheck="false"><button class="b" id="go" type="button">Go</button></div>
+    </section>
+  </div>
+</div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SAMPLE = { name: 'Shelf', version: '2.0.0', private: true, tags: ['gallery', 'static', 'tools'], stats: { artifacts: 9, installable: 4, ratio: 0.444, lastError: null },
+    artifacts: [ { slug: 'snake-game', kind: 'game', short: 'bqq6', tags: ['canvas'] }, { slug: 'decision-wheel', kind: 'app', short: null, tags: ['random', 'utility'] }, { slug: 'json-explorer', kind: 'app', short: null, tags: [] } ],
+    'odd key': { 'with.dots': 1, 'quote"d': 'say "hi"', unicode: 'café ✓' } };
+  var LIMIT = 100, data, valid = false, expanded = {}, limits = {}, rows = [], cur = 0, matches = [], mi = -1, term = '';
+
+  /* ---------- paths ---------- */
+  function seg(k) { return typeof k === 'number' ? '[' + k + ']' : (/^[A-Za-z_$][\w$]*$/.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']'); }
+  function pstr(p) { return '$' + p.map(seg).join(''); }
+  function pkey(p) { return JSON.stringify(p); }
+  function kind(v) { return v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v; }
+  function get(p) { var v = data; for (var i = 0; i < p.length; i++) v = v[p[i]]; return v; }
+  function kids(v) { return Array.isArray(v) ? v.map(function (x, i) { return [i, x]; }) : Object.keys(v).map(function (k) { return [k, v[k]]; }); }
+  function parsePath(s) {
+    s = s.trim().replace(/^\$/, ''); var out = [], re = /\.([^.[\]]+)|\[(\d+)\]|\["((?:[^"\\]|\\.)*)"\]|\['([^']*)'\]/g, m, last = 0;
+    if (s && s[0] !== '.' && s[0] !== '[') s = '.' + s;
+    while ((m = re.exec(s))) { if (m.index !== last) return null; last = re.lastIndex; out.push(m[2] !== undefined ? +m[2] : m[3] !== undefined ? JSON.parse('"' + m[3] + '"') : m[4] !== undefined ? m[4] : (/^\d+$/.test(m[1]) && Array.isArray(get(out)) ? +m[1] : m[1])); }
+    return last === s.length ? out : null;
+  }
+
+  /* ---------- parse + errors ---------- */
+  function lineCol(text, pos) { var before = text.slice(0, pos).split('\n'); return { line: before.length, col: before[before.length - 1].length + 1 }; }
+  /* Browsers word JSON errors differently (and some give no position), so find the first error ourselves. */
+  function locate(text) {
+    var i = 0, n = text.length;
+    function ws() { while (i < n && ' \t\r\n'.indexOf(text[i]) >= 0) i++; }
+    function fail(msg, at) { throw { pos: at === undefined ? i : at, msg: msg }; }
+    function str() {
+      var start = i; i++;
+      while (i < n) {
+        var c = text[i];
+        if (c === '"') { i++; return; }
+        if (c === '\n' || c < ' ') fail('Strings cannot contain a raw line break or control character');
+        if (c === '\\') { var e = text[i + 1]; if ('"\\/bfnrt'.indexOf(e) >= 0) i += 2; else if (e === 'u' && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))) i += 6; else fail('Invalid escape sequence in string', i); }
+        else i++;
+      }
+      fail('Unterminated string (missing closing quote)', start);
+    }
+    function val() {
+      ws(); if (i >= n) fail('Unexpected end of input'); var c = text[i], m;
+      if (c === '{') {
+        i++; ws(); if (text[i] === '}') { i++; return; }
+        for (;;) {
+          ws(); if (text[i] !== '"') fail(i >= n ? 'Unexpected end of input' : 'Expected a property name in double quotes');
+          str(); ws(); if (text[i] !== ':') fail("Expected ':' after the property name"); i++; val(); ws();
+          if (text[i] === ',') { i++; continue; } if (text[i] === '}') { i++; return; }
+          fail(i >= n ? 'Unexpected end of input' : "Expected ',' or '}'");
+        }
+      }
+      if (c === '[') {
+        i++; ws(); if (text[i] === ']') { i++; return; }
+        for (;;) { val(); ws(); if (text[i] === ',') { i++; continue; } if (text[i] === ']') { i++; return; } fail(i >= n ? 'Unexpected end of input' : "Expected ',' or ']'"); }
+      }
+      if (c === '"') { str(); return; }
+      if (text.startsWith('true', i)) { i += 4; return; } if (text.startsWith('false', i)) { i += 5; return; } if (text.startsWith('null', i)) { i += 4; return; }
+      var re = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y; re.lastIndex = i; m = re.exec(text);
+      if (m) { i += m[0].length; return; }
+      fail("Unexpected '" + c + "'");
+    }
+    try { val(); ws(); if (i < n) fail('Unexpected content after the end of the JSON value'); } catch (e) { return e && typeof e.pos === 'number' ? e : null; }
+    return null;
+  }
+  function explainError(text, e) {
+    var loc = locate(text), msg = loc ? loc.msg : String(e.message), line, col;
+    if (loc) { var r = lineCol(text, loc.pos); line = r.line; col = r.col; }
+    var out = { msg: msg, line: line, col: col, ctx: '' };
+    if (line) { var l = text.split('\n')[line - 1] || ''; var start = Math.max(0, col - 40); out.ctx = l.slice(start, col + 40) + '\n' + ' '.repeat(Math.max(0, col - 1 - start)) + '^'; }
+    return out;
+  }
+  function parseNow() {
+    var text = $('src').value; $('size').textContent = text ? (text.length > 1024 ? (text.length / 1024).toFixed(1) + ' KB' : text.length + ' bytes') : '';
+    var st = $('status'); st.className = 'status'; st.replaceChildren();
+    if (!text.trim()) { data = undefined; valid = false; st.textContent = 'Waiting for JSON.'; rebuild(); return; }
+    try { data = JSON.parse(text); valid = true; st.textContent = 'Valid JSON (' + kind(data) + ').'; }
+    catch (e) {
+      valid = false; var x = explainError(text, e); st.className = 'status err';
+      st.append(document.createTextNode('Invalid JSON: ' + x.msg + (x.line ? ' (line ' + x.line + ', column ' + x.col + ')' : '')));
+      if (x.ctx) { var pre = document.createElement('pre'); pre.textContent = x.ctx; st.append(pre); }
+    }
+    rebuild();
+  }
+
+  /* ---------- the tree: a flat list of visible rows, rebuilt on change ---------- */
+  function build(p, v, d, out) {
+    out.push({ p: p, v: v, d: d });
+    var k = kind(v);
+    if ((k === 'object' || k === 'array') && expanded[pkey(p)]) {
+      var all = kids(v), lim = limits[pkey(p)] || LIMIT;
+      all.slice(0, lim).forEach(function (c) { build(p.concat([c[0]]), c[1], d + 1, out); });
+      if (all.length > lim) out.push({ more: all.length - lim, p: p, d: d + 1 });
+    }
+  }
+  function hl(el, text) {
+    if (!term) { el.append(document.createTextNode(text)); return; }
+    var low = text.toLowerCase(), t = term.toLowerCase(), i = 0, j;
+    while ((j = low.indexOf(t, i)) !== -1) { el.append(document.createTextNode(text.slice(i, j))); var m = document.createElement('mark'); m.textContent = text.slice(j, j + t.length); el.append(m); i = j + t.length; }
+    el.append(document.createTextNode(text.slice(i)));
+  }
+  function span(cls, text, mark) { var s = document.createElement('span'); s.className = cls; if (mark) hl(s, text); else s.textContent = text; return s; }
+  function paint() {
+    var ul = $('tree'); ul.replaceChildren();
+    if (!valid) { var li = document.createElement('li'); li.className = 'empty'; li.textContent = data === undefined && !$('src').value.trim() ? 'The tree appears here. Try “Load sample”.' : 'Fix the error on the left to see the tree.'; ul.append(li); rows = []; return; }
+    rows = []; build([], data, 0, rows);
+    if (cur >= rows.length) cur = rows.length - 1; if (cur < 0) cur = 0;
+    var frag = document.createDocumentFragment();
+    rows.forEach(function (r, i) {
+      var li = document.createElement('li'); li.style.setProperty('--d', r.d); li.className = 'r' + (i === cur ? ' sel' : ''); li.dataset.i = i;
+      if (r.more) {
+        li.className = 'r'; li.setAttribute('role', 'none');
+        var b = document.createElement('button'); b.className = 'more'; b.style.setProperty('--d', 0); b.type = 'button'; b.textContent = '… ' + r.more + ' more (show 100 more)';
+        b.addEventListener('click', function () { limits[pkey(r.p)] = (limits[pkey(r.p)] || LIMIT) + 100; paint(); });
+        li.append(b); frag.append(li); return;
+      }
+      var k = kind(r.v), isC = k === 'object' || k === 'array', open = !!expanded[pkey(r.p)];
+      li.setAttribute('role', 'treeitem'); li.tabIndex = i === cur ? 0 : -1; if (isC) li.setAttribute('aria-expanded', String(open)); li.setAttribute('aria-level', r.d + 1);
+      li.append(span('tg', isC ? (open ? '▾' : '▸') : ''));
+      if (r.p.length) { li.append(span('k', String(r.p[r.p.length - 1]), true)); li.append(document.createTextNode(': ')); }
+      if (isC) { var n = k === 'array' ? r.v.length : Object.keys(r.v).length; li.append(span('cnt', (k === 'array' ? '[' + n + ']' : '{' + n + '}') + (open ? '' : ' ' + preview(r.v)))); }
+      else if (k === 'string') li.append(span('s', JSON.stringify(r.v), true));
+      else if (k === 'number') li.append(span('nu', String(r.v), true));
+      else if (k === 'boolean') li.append(span('bo', String(r.v), true));
+      else li.append(span('nl', 'null'));
+      var acts = document.createElement('span'); acts.className = 'acts';
+      var cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'path'; cp.setAttribute('aria-label', 'Copy path of ' + pstr(r.p)); cp.addEventListener('click', function (e) { e.stopPropagation(); copy(pstr(r.p), 'Path copied'); });
+      acts.append(cp); li.append(acts);
+      li.addEventListener('click', function () { select(i); if (isC) toggle(r.p); });
+      frag.append(li);
+    });
+    ul.append(frag); showPath();
+  }
+  function preview(v) { var s = JSON.stringify(v); return s.length > 60 ? s.slice(0, 57) + '…' + (Array.isArray(v) ? ']' : '}') : s; }
+  function showPath() { var r = rows[cur]; if (r) { $('path').textContent = pstr(r.p); } }
+  function toggle(p) { var k = pkey(p); expanded[k] = !expanded[k]; paint(); focusRow(); }
+  function select(i) { cur = i; paint(); focusRow(); }
+  function focusRow() { var el = $('tree').querySelector('[data-i="' + cur + '"]'); if (el) { el.focus({ preventScroll: false }); } }
+  function rebuild() { expanded = { '[]': true }; limits = {}; cur = 0; countStats(); runFind(true); paint(); }
+  function countStats() {
+    if (!valid) { $('stats').textContent = ''; return; }
+    var n = 0, depth = 0; (function walk(v, d) { n++; depth = Math.max(depth, d); var k = kind(v); if (k === 'object' || k === 'array') kids(v).forEach(function (c) { walk(c[1], d + 1); }); })(data, 0);
+    $('stats').textContent = n.toLocaleString() + ' values · depth ' + depth;
+  }
+
+  /* keyboard: standard tree pattern (up/down move, right opens, left closes/goes to parent, Enter toggles) */
+  $('tree').addEventListener('keydown', function (e) {
+    var r = rows[cur]; if (!r || r.more) return; var k = kind(r.v), isC = k === 'object' || k === 'array', open = !!expanded[pkey(r.p)];
+    var go = function (i) { cur = Math.max(0, Math.min(rows.length - 1, i)); paint(); focusRow(); };
+    if (e.key === 'ArrowDown') { e.preventDefault(); go(cur + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); go(cur - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); } else if (e.key === 'End') { e.preventDefault(); go(rows.length - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); if (isC && !open) toggle(r.p); else go(cur + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); if (isC && open) toggle(r.p); else { for (var i = cur - 1; i >= 0; i--) if (rows[i].d < r.d) { go(i); break; } } }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (isC) toggle(r.p); }
+    else if (e.key === 'c' && !e.ctrlKey && !e.metaKey) { copy(pstr(r.p), 'Path copied'); }
+  });
+
+  /* ---------- find ---------- */
+  function runFind(keep) {
+    term = $('q').value; matches = []; mi = -1;
+    if (valid && term) {
+      var t = term.toLowerCase();
+      (function walk(v, p) {
+        if (matches.length >= 1000) return;
+        var k = kind(v), leaf = k !== 'object' && k !== 'array';
+        var keyHit = p.length > 0 && String(p[p.length - 1]).toLowerCase().indexOf(t) !== -1;
+        var valueHit = leaf && String(v).toLowerCase().indexOf(t) !== -1;
+        if (keyHit || valueHit) matches.push(p);
+        if (!leaf) kids(v).forEach(function (c) { walk(c[1], p.concat([c[0]])); });
+      })(data, []);
+    }
+    $('qn').textContent = !term ? '' : matches.length ? (matches.length >= 1000 ? '1000+' : matches.length) + ' found' : 'no match';
+    if (!keep) { if (matches.length) jump(0); else paint(); }
+  }
+  function reveal(p) { for (var i = 0; i < p.length; i++) { var anc = p.slice(0, i), k = pkey(anc); expanded[k] = true; var lim = limits[k] || LIMIT, kk = kids(get(anc)).findIndex(function (c) { return c[0] === p[i]; }); if (kk >= lim) limits[k] = kk + 1; } }
+  function jump(n) {
+    if (!matches.length) return; mi = (n + matches.length) % matches.length; var p = matches[mi]; reveal(p);   // opens every parent of the match
+    paint(); var idx = rows.findIndex(function (r) { return !r.more && pkey(r.p) === pkey(p); }); if (idx >= 0) { cur = idx; paint(); focusRow(); }
+    $('qn').textContent = (mi + 1) + ' / ' + (matches.length >= 1000 ? '1000+' : matches.length);
+  }
+  $('q').addEventListener('input', function () { runFind(false); });
+  $('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); jump(mi + (e.shiftKey ? -1 : 1)); } });
+  $('next').addEventListener('click', function () { jump(mi + 1); }); $('prev').addEventListener('click', function () { jump(mi - 1); });
+  $('go').addEventListener('click', goto); $('goto').addEventListener('keydown', function (e) { if (e.key === 'Enter') goto(); });
+  function goto() {
+    if (!valid) return; var p = parsePath($('goto').value);
+    if (!p) { say('Could not read that path. Try $.users[0].name'); return; }
+    var v = data; for (var i = 0; i < p.length; i++) { if (v === null || typeof v !== 'object' || !(p[i] in v)) { say('Nothing at ' + pstr(p.slice(0, i + 1))); return; } v = v[p[i]]; }
+    reveal(p); paint(); var idx = rows.findIndex(function (r) { return !r.more && pkey(r.p) === pkey(p); }); if (idx >= 0) { cur = idx; paint(); focusRow(); say('Went to ' + pstr(p)); }
+  }
+
+  /* ---------- toolbar ---------- */
+  function say(t) { var s = $('status'); if (valid) { s.className = 'status'; s.textContent = t; } }
+  function copy(text, ok) {
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { say(ok || 'Copied'); }, function () { window.prompt('Copy this', text); });
+  }
+  function sortDeep(v) { if (Array.isArray(v)) return v.map(sortDeep); if (v && typeof v === 'object') { var o = {}; Object.keys(v).sort().forEach(function (k) { o[k] = sortDeep(v[k]); }); return o; } return v; }
+  var timer;
+  function flush() { if (timer) { clearTimeout(timer); timer = null; parseNow(); } }   // parse what was just typed before acting on it
+  function setText(t) { clearTimeout(timer); timer = null; $('src').value = t; parseNow(); }
+  $('sample').addEventListener('click', function () { setText(JSON.stringify(SAMPLE, null, 2)); });
+  $('fmt').addEventListener('click', function () { flush(); if (valid) setText(JSON.stringify(data, null, 2)); });
+  $('min').addEventListener('click', function () { flush(); if (valid) setText(JSON.stringify(data)); });
+  $('sort').addEventListener('click', function () { flush(); if (valid) setText(JSON.stringify(sortDeep(data), null, 2)); });
+  $('copy').addEventListener('click', function () { if ($('src').value) copy($('src').value, 'Input copied'); });
+  $('clear').addEventListener('click', function () { setText(''); $('q').value = ''; $('src').focus(); });
+  $('expand').addEventListener('click', function () {
+    if (!valid) return; var n = 0; (function walk(v, p, d) { var k = kind(v); if ((k === 'object' || k === 'array') && n < 2000) { n++; expanded[pkey(p)] = true; kids(v).forEach(function (c) { walk(c[1], p.concat([c[0]]), d + 1); }); } })(data, [], 0);
+    paint(); say(n >= 2000 ? 'Expanded the first 2000 containers; the rest stay closed to keep the page fast.' : 'Expanded everything.');
+  });
+  $('collapse').addEventListener('click', function () { expanded = { '[]': true }; cur = 0; paint(); });
+  $('cpath').addEventListener('click', function () { if (rows[cur]) copy(pstr(rows[cur].p), 'Path copied'); });
+  $('cval').addEventListener('click', function () { if (rows[cur] && !rows[cur].more) copy(JSON.stringify(rows[cur].v, null, 2), 'Value copied'); });
+  $('paste').addEventListener('click', function () {
+    if (!navigator.clipboard || !navigator.clipboard.readText) { $('src').focus(); say('Your browser blocks reading the clipboard here: click the box and press Ctrl/Cmd+V.'); return; }
+    navigator.clipboard.readText().then(setText, function () { $('src').focus(); say('Clipboard access was blocked: click the box and press Ctrl/Cmd+V.'); });
+  });
+  function readFile(f) { if (!f) return; if (f.size > 20e6) { say('That file is over 20 MB: too large for this page.'); return; } f.text().then(setText); }
+  $('file').addEventListener('change', function () { readFile(this.files[0]); this.value = ''; });
+  var box = $('src');
+  ['dragenter', 'dragover'].forEach(function (n) { box.addEventListener(n, function (e) { e.preventDefault(); box.classList.add('drag'); }); });
+  ['dragleave', 'drop'].forEach(function (n) { box.addEventListener(n, function () { box.classList.remove('drag'); }); });
+  box.addEventListener('drop', function (e) { e.preventDefault(); readFile(e.dataTransfer.files[0]); });
+  box.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { timer = null; parseNow(); }, 200); });
+  setText(JSON.stringify(SAMPLE, null, 2));   // open on an example so the tree is visible straight away; Clear empties it
+})();
+</script>
+</body>
+</html>

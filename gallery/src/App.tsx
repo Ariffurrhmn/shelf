@@ -5,7 +5,6 @@ import { Explore } from "@/components/explore"
 import { Featured } from "@/components/featured"
 import { Footer } from "@/components/footer"
 import { Header } from "@/components/header"
-import { Hero } from "@/components/hero"
 import { ArtifactDialog } from "@/components/artifact-dialog"
 import { useBrowse } from "@/hooks/use-browse"
 import { useDetailsRoute } from "@/hooks/use-details-route"
@@ -58,8 +57,9 @@ export default function App() {
     <div className="min-h-dvh">
       <Header theme={theme} onToggleTheme={toggle} repo={repo} />
 
-      <main id="main" tabIndex={-1} className="outline-none">
-        <Hero />
+      <main id="main" tabIndex={-1} className="pt-8 outline-none sm:pt-12">
+        {/* The page title is for screen readers and search engines; the collection itself is the first thing on screen. */}
+        <h1 className="sr-only-live">Shelf: small experiments, useful creations</h1>
 
         {state.status === "loading" && (
           <section className="wrap pb-16" aria-busy="true" aria-label="Loading artifacts">

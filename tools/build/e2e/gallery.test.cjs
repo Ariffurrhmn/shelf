@@ -19,6 +19,19 @@ const { serve } = require("../lib/serve.cjs")
 const SITE = path.resolve(__dirname, "..", "..", "..", "site")
 const PREFIX = "/shelf"
 
+// The real collection grows, so expectations come from the built manifest instead of being typed in.
+const REAL = JSON.parse(fs.readFileSync(path.join(SITE, "artifacts.json"), "utf8")).artifacts
+const N = REAL.length
+const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
+const byTitle = (a, b) => collator.compare(a.title, b.title) || a.slug.localeCompare(b.slug)
+const ORDER = {
+  newest: (a, b) => b.created.localeCompare(a.created) || byTitle(a, b),
+  oldest: (a, b) => a.created.localeCompare(b.created) || byTitle(a, b),
+  "title-asc": byTitle,
+  "title-desc": (a, b) => byTitle(b, a),
+}
+const expected = (sort, filter = () => true) => REAL.filter(filter).sort(ORDER[sort]).map((a) => a.title)
+
 let browser, real, fixture, tmp
 
 function craft(manifest) {
@@ -80,11 +93,20 @@ const waitCards = (page, n) => page.waitForFunction((n) => document.querySelecto
 const titles = (page) => page.locator("article h3").allTextContents()
 
 describe("homepage", () => {
-  test("renders the hero and one card per artifact, without stats lines, with no console errors", async () => {
+  test("opens straight on the collection: no hero, no stats lines, one card per artifact, no console errors", async () => {
     const { page, context, problems } = await open(real)
-    assert.equal(await page.getByRole("heading", { level: 1 }).innerText(), "Small experiments. Useful creations.")
+    assert.equal(await page.getByRole("heading", { level: 1 }).innerText(), "Shelf: small experiments, useful creations")
+    // the h1 and the "Explore Shelf" heading exist for screen readers only
+    for (const name of ["Shelf: small experiments, useful creations", "Explore Shelf"]) {
+      const box = await page.getByRole("heading", { name }).boundingBox()
+      assert.ok(box.width <= 2 && box.height <= 2, `${name} is visually hidden`)
+    }
+    assert.equal(await page.getByText("A personal digital playground").count(), 0)
+    assert.equal(await page.getByRole("link", { name: "Explore the collection" }).count(), 0)
+    const firstCard = await page.locator("article").first().boundingBox()
+    assert.ok(firstCard.y < 500, `the first card starts high on the page (y=${Math.round(firstCard.y)})`)
     assert.doesNotMatch(await page.locator("body").innerText(), /\d+ categories|built \w{3} \d/, "the stats lines are gone")
-    assert.equal(await cards(page).count(), 3)
+    assert.equal(await cards(page).count(), N)
     assert.equal(await page.getByRole("heading", { name: "Featured", exact: true }).count(), 0, "no featured section when nothing is featured")
     assert.deepEqual(problems, [])
     await context.close()
@@ -125,11 +147,11 @@ describe("discovery", () => {
     const search = page.getByRole("searchbox", { name: "Search artifacts" })
     await search.fill("POMODORO")
     await waitTitles(page, ["Pomodoro timer"])
-    assert.match(await page.getByRole("status").first().innerText(), /1 of 3 artifacts match/)
+    assert.match(await page.getByRole("status").first().innerText(), new RegExp(`1 of ${N} artifacts match`))
     await page.getByRole("button", { name: /^Games/ }).click()
     assert.match(await page.getByText("Nothing matches").innerText(), /Nothing matches/)
     await page.getByRole("button", { name: "Clear all filters" }).click()
-    await waitCards(page, 3)
+    await waitCards(page, N)
     assert.equal(await search.inputValue(), "")
     await context.close()
   })
@@ -148,23 +170,23 @@ describe("discovery", () => {
 
   test("category and tag filters, sorting, and URL state survive a reload", async () => {
     const { page, context } = await open(real)
+    const isApp = (x) => x.kind === "app", isProductiveApp = (x) => x.kind === "app" && x.tags.includes("productivity")
+    assert.ok(REAL.filter(isApp).length > REAL.filter(isProductiveApp).length && REAL.some(isProductiveApp), "the collection has apps with and without the tag")
     await page.getByRole("button", { name: /^Apps/ }).click()
-    await waitCards(page, 1)
+    await waitCards(page, REAL.filter(isApp).length)
     await page.getByRole("button", { name: /^Tags/ }).click()
     await page.getByRole("button", { name: /^#productivity/ }).click()
-    await waitTitles(page, ["Pomodoro timer"])
+    await waitTitles(page, expected("newest", isProductiveApp))
     await page.waitForTimeout(400)
     assert.match(page.url(), /kind=app/)
     assert.match(page.url(), /tag=productivity/)
     await page.reload({ waitUntil: "networkidle" })
-    await waitTitles(page, ["Pomodoro timer"])
+    await waitTitles(page, expected("newest", isProductiveApp))
     await page.getByRole("button", { name: "Clear filters" }).click()
-    await page.getByLabel("Sort").selectOption("title-asc")
-    await waitTitles(page, ["Pomodoro timer", "Shelf: a short introduction", "Snake"])
-    await page.getByLabel("Sort").selectOption("oldest")
-    await waitTitles(page, ["Pomodoro timer", "Snake", "Shelf: a short introduction"])
-    await page.getByLabel("Sort").selectOption("newest")
-    await waitTitles(page, ["Shelf: a short introduction", "Snake", "Pomodoro timer"])
+    for (const sort of ["title-asc", "oldest", "title-desc", "newest"]) {
+      await page.getByLabel("Sort").selectOption(sort)
+      await waitTitles(page, expected(sort))
+    }
     await context.close()
   })
 
@@ -243,7 +265,7 @@ describe("details dialog and history", () => {
     await page.getByRole("button", { name: "Close details" }).click()
     await dialog.waitFor({ state: "hidden" })
     assert.equal(page.url(), real.url)
-    assert.equal(await cards(page).count(), 3)
+    assert.equal(await cards(page).count(), N)
     await context.close()
   })
 
@@ -337,7 +359,7 @@ describe("links", () => {
     const root = await serve(SITE)
     try {
       const { page, context, problems } = await open(root)
-      assert.equal(await cards(page).count(), 3)
+      assert.equal(await cards(page).count(), N)
       assert.deepEqual(problems, [])
       await context.close()
     } finally {
@@ -347,9 +369,9 @@ describe("links", () => {
 })
 
 describe("spec + prompt button", () => {
-  test("copies the prompt, the spec and the metadata reference in one go, from the header and the hero", async () => {
+  test("copies the prompt, the spec and the metadata reference in one go, from the header", async () => {
     const { page, context } = await open(real, "", { permissions: ["clipboard-read", "clipboard-write"] })
-    for (const where of ["header", "section[aria-labelledby=hero-title]"]) {
+    for (const where of ["header"]) {
       await page.evaluate(() => navigator.clipboard.writeText("empty"))
       await page.locator(where).getByRole("button", { name: /Spec \+ prompt/ }).click()
       await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes("Part 3")))

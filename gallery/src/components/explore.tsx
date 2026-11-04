@@ -50,14 +50,13 @@ export function Explore(p: Props) {
 
   return (
     <section id="explore" tabIndex={-1} aria-labelledby="explore-title" className="wrap scroll-mt-16 pb-16 outline-none">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-line pt-8">
-        <h2 id="explore-title" className="text-2xl font-semibold sm:text-3xl">
-          Explore Shelf
-        </h2>
-        <p className="mono-meta" role="status" aria-live="polite">
-          {countText}
-        </p>
-      </div>
+      {/* Section title and live result count: announced to screen readers, not drawn. */}
+      <h2 id="explore-title" className="sr-only-live">
+        Explore Shelf
+      </h2>
+      <p className="sr-only-live" role="status" aria-live="polite">
+        {countText}
+      </p>
 
       {all.length > 0 && (
         <div className="mb-8 space-y-4">

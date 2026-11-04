@@ -7,7 +7,7 @@
     "playwright": "^1.55.0"
   },
   "scripts": {
-    "e2e": "node --test --test-concurrency=1 e2e/gallery.test.cjs",
+    "e2e": "node --test --test-concurrency=1 e2e/gallery.test.cjs e2e/artifacts.test.cjs",
     "thumbnails": "node thumbnails.cjs",
     "og": "node og.cjs"
   }
