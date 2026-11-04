@@ -144,7 +144,7 @@ _PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Redirecting to {label}</title>
+{share}<title>Redirecting to {label}</title>
 <link rel="canonical" href="{href}">
 <script>
 (function () {{
@@ -170,10 +170,12 @@ def _js_string(value: str) -> str:
     return json.dumps(value).replace("<", "\\u003c")
 
 
-def redirect_page(target: str, label: str, *, forward: bool) -> str:
+def redirect_page(target: str, label: str, *, forward: bool, share: str = "") -> str:
     """HTML for one redirect. `forward` carries ?query and #hash to the target,
-    which is how a link like /ab3k#4 can open slide 4."""
+    which is how a link like /ab3k#4 can open slide 4. `share` is optional
+    pre-escaped <meta> markup (Open Graph) so crawlers see a card."""
     return _PAGE.format(
+        share=share + "\n" if share else "",
         href=html.escape(target, quote=True),
         label=html.escape(label),
         target=_js_string(target),
@@ -181,8 +183,11 @@ def redirect_page(target: str, label: str, *, forward: bool) -> str:
     )
 
 
-def write_redirects(out: Path, plan: Plan) -> int:
-    """Write site/<code>/index.html for every code. Returns how many."""
+def write_redirects(out: Path, plan: Plan, share: dict[str, str] | None = None) -> int:
+    """Write site/<code>/index.html for every code. Returns how many.
+
+    `share` maps a slug to ready-made Open Graph markup for its redirect page."""
+    share = share or {}
     # `artifacts`, `assets` and friends are reserved by the validator, but the
     # gallery build may emit other top-level names too; never overwrite them.
     problems = [
@@ -193,7 +198,7 @@ def write_redirects(out: Path, plan: Plan) -> int:
     if problems:
         raise ShortLinkError(problems)
     for slug, code in plan.artifacts.items():
-        _write(out / code, redirect_page(f"../artifacts/{slug}/", slug, forward=True))
+        _write(out / code, redirect_page(f"../artifacts/{slug}/", slug, forward=True, share=share.get(slug, "")))
     for code, url in plan.external.items():
         _write(out / code, redirect_page(url, urlparse(url).netloc, forward=False))
     return len(plan.codes())
@@ -202,6 +207,23 @@ def write_redirects(out: Path, plan: Plan) -> int:
 def _write(folder: Path, text: str) -> None:
     folder.mkdir(parents=True)
     (folder / "index.html").write_text(text, encoding="utf-8")
+
+
+def write_alias_redirects(out: Path, aliases: dict[str, str]) -> int:
+    """Keep old artifact addresses alive: site/artifacts/<old>/ -> ../<new>/.
+
+    `aliases` maps an old slug to the artifact's current slug. Query string and
+    hash are forwarded, so an old link to a slide still opens that slide."""
+    problems = [
+        f"Alias {old!r} (of {new!r}) would overwrite {out / 'artifacts' / old}; remove the alias or rename the artifact."
+        for old, new in sorted(aliases.items())
+        if (out / "artifacts" / old).exists()
+    ]
+    if problems:
+        raise ShortLinkError(problems)
+    for old, new in aliases.items():
+        _write(out / "artifacts" / old, redirect_page(f"../{new}/", new, forward=True))
+    return len(aliases)
 
 
 def base_url(env: dict[str, str] | None = None) -> str | None:

@@ -5,5 +5,10 @@
   "description": "Thumbnail generation for Shelf (Playwright).",
   "dependencies": {
     "playwright": "^1.55.0"
+  },
+  "scripts": {
+    "e2e": "node --test --test-concurrency=1 e2e/gallery.test.cjs",
+    "thumbnails": "node thumbnails.cjs",
+    "og": "node og.cjs"
   }
 }
