@@ -152,3 +152,11 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 - **Why:** the slow part of the old flow was getting code out of a chat window and into a file. Both routes use the same pipeline as `shelf add`, so there is one set of rules, not three.
 - **Rejected:** a token in the browser (any artifact on the same origin could read it), auto-merge of inbox PRs (the human look at the PR is the safety check), and a hosted ingestion service (violates "no backend").
 - **Trade-offs:** the inbox commits before it scans (documented in security.md; the clipboard route does not); bot commits made with the default token do not start other workflows, so the ingest job validates and builds itself; there is no live preview of a PR on a single GitHub Pages site.
+
+## Installable by default for the tools you keep
+
+- **Status:** decided
+- Tools meant to live on a phone (Holocron, Decision Wheel, JSON Explorer, 168 Hours, Review Queue, and the three older samples) set `install: true` and supply an `icon`. Premortem, a one-off exercise, stays a web page; flipping it is one line.
+- `icon` is a square 512x512+ PNG; the build decodes it with a small standard-library PNG reader (all five PNG filters, 8-bit RGB/RGBA) and averages it down to 192 px, so the build still needs nothing but Python. The validator uses the same check, so a bad icon fails with a reason instead of at deploy time. Icons are full-bleed so phones can round or crop them (maskable).
+- **Why not just generate them:** a slug-derived pattern is fine for a sample, but it is the one thing you look at every day on a Home Screen.
+- **Limits:** installed apps keep their own storage per device (and on iOS separate from Safari), so installing does not sync anything; see the README.

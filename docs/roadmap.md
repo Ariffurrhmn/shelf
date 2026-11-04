@@ -18,6 +18,7 @@ The short version is in the README. This file tracks detail.
 
 - [x] Adding artifacts: `shelf add --clipboard`, `-` for stdin, opt-in `--commit`/`--push`, and the inbox (`shelf ingest` + `ingest.yml`)
 - [x] Six more artifacts: Holocron (Star Wars watch order), Decision Wheel, JSON Explorer, 168 Hours, Premortem, Review Queue, each with end-to-end tests
+- [x] Artifact-supplied app icons (`icon`), iPhone Home Screen tags, eight installable artifacts with offline tests
 
 ## Next
 
@@ -32,7 +33,6 @@ The short version is in the README. This file tracks detail.
 
 - [ ] A separate origin for artifacts, if Shelf ever hosts things its owner did not write (see [security.md](security.md))
 - [ ] Make the gallery itself installable
-- [ ] Let an artifact supply its own app icon instead of the generated one
 - [ ] Offline copies of pinned libraries inside an artifact, for conference use
 - [ ] Watch mode (`shelf watch ~/Downloads`) that offers to add new `.html` files
 - [ ] A gist-based variant of the inbox that scans before anything enters git

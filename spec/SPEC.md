@@ -93,6 +93,8 @@ An artifact can be installed on a desktop or phone and keep working offline. It 
 - Set `"install": true` in the metadata. Optionally set `"color"` (a hex colour such as `"#d64933"`) for the app's theme colour and icon background. The default is a colour derived from the slug.
 - The build, not the author, adds: `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and `sw.js` in the served folder, and a block before `</head>` in the served `index.html` that links the manifest, registers the service worker and shows an install prompt when the URL ends in `#install`. These file names are reserved: an installable artifact MUST NOT contain them.
 - The artifact MUST NOT link its own web app manifest or register its own service worker. The build stops if it finds a manifest link.
+- An installable artifact may supply its own icon with the `icon` field (section 3, METADATA.md): a square PNG of at least 512x512. The build scales it to the 192 and 512 pixel icons phones ask for and uses it for the Home Screen. Without one, the build draws a pattern from the slug.
+- The build also adds the tags iPhone and iPad need to open the app full-screen from the Home Screen, with its title as the label.
 - Everything in the folder is cached when the app is installed, so all assets MUST be local files or approved pinned CDN files. Approved CDN and font responses are cached the first time they load. Requests to any other domain in `network` need a connection, and the validator warns about them.
 - Each installed app is scoped to its own folder and updates when its files change (the cache name carries a content hash). A new version takes effect after the app is closed and opened again.
 

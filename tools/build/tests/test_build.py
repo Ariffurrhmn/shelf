@@ -287,3 +287,118 @@ class TestPwa(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _png(size, fn, ch=3, filter_type=0):
+    """A PNG whose pixel (x, y, c) is fn(x, y, c), written with the given PNG row filter."""
+    rows = [bytearray(fn(x, y, c) & 255 for x in range(size) for c in range(ch)) for y in range(size)]
+    out, prev = bytearray(), bytearray(size * ch)
+    for line in rows:
+        f = bytearray(len(line))
+        for i in range(len(line)):
+            a = line[i - ch] if i >= ch else 0
+            b = prev[i]
+            c = prev[i - ch] if i >= ch else 0
+            if filter_type == 0:
+                pred = 0
+            elif filter_type == 1:
+                pred = a
+            elif filter_type == 2:
+                pred = b
+            elif filter_type == 3:
+                pred = (a + b) >> 1
+            else:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                pred = a if pa <= pb and pa <= pc else b if pb <= pc else c
+            f[i] = (line[i] - pred) & 255
+        out += bytes([filter_type]) + f
+        prev = line
+    import struct as st
+    import zlib as zl
+
+    def chunk(tag, body):
+        return st.pack(">I", len(body)) + tag + body + st.pack(">I", zl.crc32(tag + body) & 0xFFFFFFFF)
+
+    return (pwa.PNG_SIGNATURE + chunk(b"IHDR", st.pack(">IIBBBBB", size, size, 8, 2 if ch == 3 else 6, 0, 0, 0))
+            + chunk(b"IDAT", zl.compress(bytes(out))) + chunk(b"IEND", b""))
+
+
+class TestIconPng(unittest.TestCase):
+    def test_every_png_filter_type_decodes_to_the_same_pixels(self):
+        fn = lambda x, y, c: (x * 7 + y * 13 + c * 29) ^ (x * y)  # noqa: E731
+        want = None
+        for ch in (3, 4):
+            for ft in range(5):
+                w, h, got_ch, rows = pwa.decode_png(_png(24, fn, ch, ft))
+                self.assertEqual((w, h, got_ch), (24, 24, ch))
+                pixels = [bytes(r) for r in rows]
+                if got_ch == 3:
+                    want = want or pixels
+                    self.assertEqual(pixels, want, f"filter {ft}")
+                self.assertEqual(pixels[5][3 * ch + 1], fn(3, 5, 1) & 255)
+
+    def test_resize_keeps_average_colour_and_size(self):
+        img = _png(512, lambda x, y, c: 200 if (x // 64 + y // 64) % 2 == 0 else 40, 3)
+        made = pwa.icons_from_file(img)
+        self.assertEqual(made[512], img)  # already 512: passed through untouched
+        hd = pwa.png_header(made[192])
+        self.assertEqual((hd["width"], hd["height"]), (192, 192))
+        _, _, _, rows = pwa.decode_png(made[192])
+        mean = sum(sum(r) for r in rows) / (192 * 192 * 3)
+        self.assertAlmostEqual(mean, 120, delta=2)
+
+    def test_a_larger_source_is_scaled_to_both_sizes(self):
+        made = pwa.icons_from_file(_png(768, lambda x, y, c: 90, 3))
+        self.assertEqual({k: pwa.png_header(v)["width"] for k, v in made.items()}, {192: 192, 512: 512})
+
+    def test_problems_are_explained(self):
+        self.assertIn("not a PNG", pwa.png_problem(b"GIF89a....."))
+        self.assertIn("at least 512", pwa.png_problem(_png(64, lambda x, y, c: 0)))
+        self.assertIsNone(pwa.png_problem(_png(512, lambda x, y, c: 0)))
+        with self.assertRaises(pwa.PwaError):
+            pwa.decode_png(b"nope")
+
+    def test_every_icon_in_the_repo_is_usable_and_resizes(self):
+        found = [p for p in (REPO / "artifacts").glob("*/icon.png")]
+        self.assertGreaterEqual(len(found), 8)
+        for path in found:
+            data = path.read_bytes()
+            self.assertIsNone(pwa.png_problem(data), path.parent.name)
+            hd = pwa.png_header(data)
+            self.assertEqual((hd["width"], hd["height"]), (512, 512), path.parent.name)
+            small = pwa.icons_from_file(data)[192]
+            self.assertEqual(pwa.png_header(small)["width"], 192)
+
+
+class TestInstallIcons(unittest.TestCase):
+    def built(self, d, icon_png, extra=',"install":true,"icon":"icon.png"'):
+        root, out = Path(d) / "artifacts", Path(d) / "site"
+        artifact(root, "app-one", extra)
+        if icon_png is not None:
+            (root / "app-one" / "icon.png").write_bytes(icon_png)
+        rc = build.main(["--artifacts-dir", str(root), "--out", str(out), "--skip-gallery", "--no-thumbnails"])
+        return rc, out / sl.auto_code("app-one")
+
+    def test_author_icon_is_used_for_both_sizes(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = _png(512, lambda x, y, c: [10, 120, 200][c], 3)
+            rc, dest = self.built(d, src)
+            self.assertEqual(rc, 0)
+            self.assertEqual((dest / "icon-512.png").read_bytes(), src)
+            self.assertEqual(pwa.png_header((dest / "icon-192.png").read_bytes())["width"], 192)
+            _, _, _, rows = pwa.decode_png((dest / "icon-192.png").read_bytes())
+            self.assertEqual(tuple(rows[100][300:303]), (10, 120, 200))
+
+    def test_no_icon_falls_back_to_the_generated_pattern(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, dest = self.built(d, None, ',"install":true')
+            self.assertEqual(rc, 0)
+            self.assertTrue((dest / "icon-192.png").read_bytes().startswith(b"\x89PNG"))
+
+    def test_iphone_tags_are_added(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, dest = self.built(d, _png(512, lambda x, y, c: 0, 3))
+            html = (dest / "index.html").read_text()
+            self.assertIn('<meta name="apple-mobile-web-app-capable" content="yes">', html)
+            self.assertIn('<meta name="apple-mobile-web-app-title" content="T app-one">', html)
+            self.assertIn('<link rel="apple-touch-icon" href="icon-192.png">', html)

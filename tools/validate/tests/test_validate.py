@@ -351,6 +351,42 @@ class TestDocsInSync(unittest.TestCase):
             self.assertIn(f"| `{field}` |", text, f"spec/METADATA.md has no table row for {field!r}")
 
 
+class TestIconField(Base):
+    def png(self, size):
+        sys.path.insert(0, str(REPO / "tools" / "build"))
+        import pwa
+
+        return pwa.encode_png(size, 3, [bytearray(size * 3) for _ in range(size)]) if size >= 8 else b""
+
+    def check_icon(self, name, data, install=True):
+        meta = {"install": install, "icon": name}
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "demo"
+            root.mkdir()
+            (root / "index.html").write_text(page(meta), encoding="utf-8")
+            if data is not None:
+                (root / name.split("/")[-1]).write_bytes(data)
+            return v.validate_artifact(root)
+
+    def test_a_good_icon_passes(self):
+        res = self.check_icon("icon.png", self.png(512))
+        self.assertTrue(res.ok, [i.message for i in res.errors])
+
+    def test_name_rules(self):
+        for bad in ("../icon.png", "sub/icon.png", "icon.svg", ".icon.png", "icon.PNG.exe"):
+            self.assertIn("META-ICON", self.codes(self.check_icon(bad, self.png(512)), v.ERROR), bad)
+
+    def test_missing_wrong_type_and_too_small(self):
+        self.assertIn("does not exist", " ".join(i.message for i in self.check_icon("icon.png", None).errors))
+        self.assertIn("not a PNG", " ".join(i.message for i in self.check_icon("icon.png", b"GIF89a-not-a-png-at-all-padding").errors))
+        self.assertIn("at least 512", " ".join(i.message for i in self.check_icon("icon.png", self.png(64)).errors))
+
+    def test_icon_without_install_is_a_warning(self):
+        res = self.check_icon("icon.png", self.png(512), install=False)
+        self.assertTrue(res.ok)
+        self.assertIn("META-ICON", self.codes(res, v.WARNING))
+
+
 class TestSecurityRules(Base):
     def test_meta_refresh_to_external_is_error(self):
         res = self.check(page(head='<meta http-equiv="refresh" content="0; url=https://evil.example.org/">'))

@@ -371,3 +371,59 @@ describe("Review Queue", () => {
     await context.close()
   })
 })
+
+describe("installable apps (PWA)", () => {
+  const installable = () => manifest().filter((a) => a.install)
+  const pngSize = (buf) => [buf.readUInt32BE(16), buf.readUInt32BE(20)]
+
+  test("every app marked install is in the gallery data, and the right ones are", () => {
+    const slugs = installable().map((a) => a.slug).sort()
+    for (const must of ["decision-wheel", "star-wars-watch-order", "json-explorer", "168-hours", "review-queue"]) assert.ok(slugs.includes(must), `${must} is installable`)
+    assert.ok(!slugs.includes("premortem"), "premortem is left as a web page")
+  })
+
+  for (const slug of ["decision-wheel", "star-wars-watch-order", "json-explorer", "168-hours", "review-queue", "pomodoro-timer", "snake-game", "shelf-intro-slides"]) {
+    test(`${slug}: manifest, real icons and iPhone tags`, async () => {
+      const { page, context } = await open(slug)
+      const entry = manifest().find((a) => a.slug === slug)
+      const base = `${server.url}${entry.short}/`
+      const mf = await (await context.request.get(base + (await page.locator('link[rel=manifest]').getAttribute("href")))).json()
+      assert.equal(mf.name, entry.title)
+      assert.equal(mf.display, "standalone")
+      assert.equal(mf.scope, "./"); assert.equal(mf.start_url, "./")
+      assert.match(mf.theme_color, /^#[0-9a-f]{6}$/i)
+      for (const [size, file] of [[192, "icon-192.png"], [512, "icon-512.png"]]) {
+        const res = await context.request.get(base + file)
+        assert.equal(res.status(), 200); assert.match(res.headers()["content-type"], /image\/png/)
+        assert.deepEqual(pngSize(await res.body()), [size, size], `${file} is really ${size}px`)
+      }
+      assert.equal(await page.locator('link[rel=apple-touch-icon]').getAttribute("href"), "icon-192.png")
+      assert.equal(await page.locator('meta[name=apple-mobile-web-app-capable]').getAttribute("content"), "yes")
+      assert.equal(await page.locator('meta[name=apple-mobile-web-app-title]').count(), 1)
+      await context.close()
+    })
+  }
+
+  for (const slug of ["decision-wheel", "star-wars-watch-order", "json-explorer", "168-hours", "review-queue"]) {
+    test(`${slug}: the service worker takes over and the app still opens with the network off`, async () => {
+      const { page, context } = await open(slug)
+      await page.evaluate(() => navigator.serviceWorker.ready)
+      await page.reload({ waitUntil: "load" })          // now served by the service worker
+      assert.equal(await page.evaluate(() => !!navigator.serviceWorker.controller), true)
+      await context.setOffline(true)
+      await page.reload({ waitUntil: "load" })
+      assert.equal(await page.locator("h1").count() > 0, true, "the page rendered from the cache")
+      assert.ok((await page.title()).length > 0)
+      await context.close()
+    })
+  }
+
+  test("data written while online is still there offline (the Holocron's progress)", async () => {
+    const { page, context } = await open("star-wars-watch-order")
+    await page.evaluate(() => navigator.serviceWorker.ready); await page.reload()
+    await page.click("#next-mark")
+    await context.setOffline(true); await page.reload()
+    assert.match(await page.locator("#count").innerText(), /^1 \//)
+    await context.close()
+  })
+})
