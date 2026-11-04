@@ -28,6 +28,7 @@ flowchart LR
 | Short links | `tools/build/shortlinks.py` | Picks a short code per artifact, reads `links.json`, writes redirect pages for `links.json` entries and for every older address. |
 | Thumbnails | `tools/build/thumbnails.cjs` | Captures 1280×800 and 640×400 WebP per artifact in a request-allowlisted headless browser, cached by content hash. |
 | PWA step | `tools/build/pwa.py` | For `install: true`: manifest, icons, service worker, injected tags. |
+| Inbox | `inbox/`, `shelf ingest`, `.github/workflows/ingest.yml` | Files dropped in `inbox/` on a pull request become artifacts on that PR. See [ai-workflow.md](ai-workflow.md). |
 | Gallery | `gallery/` | Vite + React + Tailwind v4. Reads `artifacts.json`. See `gallery/README.md`. |
 | E2E tests | `tools/build/e2e/` | Playwright against the built site, served under `/shelf/`. |
 | Deploy | `.github/workflows/deploy.yml` | Tests, builds, checks permanent links, deploys `main` to Pages. |

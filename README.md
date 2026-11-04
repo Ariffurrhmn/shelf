@@ -50,12 +50,19 @@ python shelf preview                   # builds the site and serves http://127.0
 
 ### Add a creation
 
+Three ways, from least to most setup. All of them validate first and never publish by themselves.
+
+**1. From the clipboard** (at your computer). Press **Spec + prompt** on the site and paste it into Claude or ChatGPT before you ask for the app. When the reply arrives, click Copy on its code block, then:
+
 ```bash
-python shelf prompt --full             # or press "Spec + prompt" on the site: paste into Claude / ChatGPT first
-python shelf add my-app.html           # asks for anything missing, validates, files it
-python shelf preview my-app            # see it in the real gallery
-git add artifacts/my-app && git commit -m "Add my app" && git push
+python shelf add --clipboard           # keeps just the HTML, validates, asks "Add it?"
+python shelf preview <slug>            # see it in the real gallery
+python shelf add --clipboard --yes --push   # or: no questions, commit and push (to main this deploys)
 ```
+
+**2. From a file.** `python shelf add my-app.html` (or a folder with an `index.html`), then commit and push yourself.
+
+**3. From GitHub, without cloning** (works on a phone). Put the HTML in `inbox/`: on the repo page choose *Add file → Create new file*, name it `inbox/anything.html`, paste, and choose *create a new branch and start a pull request*. A workflow turns it into an artifact on that PR and comments with the result; merge to publish. Name the file after an existing artifact (`focus-timer.html`) to update it. Details and a caveat about secrets: [`inbox/README.md`](inbox/README.md).
 
 Non-interactive (scripts, CI):
 
@@ -70,7 +77,8 @@ The full walkthrough, all flags and troubleshooting are in [`docs/ai-workflow.md
 
 | Command | What it does |
 | --- | --- |
-| `shelf add <file\|folder>` | Import HTML as a new artifact. `--dry-run`, `--fix`, `--force`, `--thumbnail`, metadata flags. |
+| `shelf add <file\|folder\|->` / `--clipboard` | Import HTML as a new artifact. `--dry-run`, `--fix`, `--force`, `--thumbnail`, `--commit`, `--push`, metadata flags. |
+| `shelf ingest` | Turn the files in `inbox/` into artifacts (what the inbox workflow runs). |
 | `shelf validate [slug…]` | Check against the spec. `--strict` fails on warnings; `--json` for tools. |
 | `shelf list` | The collection at a glance (`--json`). |
 | `shelf preview [slug]` | Build and serve under `/shelf/` like GitHub Pages. `--raw` serves `artifacts/` instantly. |

@@ -143,3 +143,11 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 
 - **Status:** decided
 - The gallery says "artifact" everywhere (the repo's own word); the hero's statistics line and the footer's count/date line were removed. Result counts (for example "3 of 4 artifacts match") stay because they are feedback for search and filters.
+
+## Two new ways in: clipboard and inbox
+
+- **Status:** decided
+- `shelf add --clipboard` (or `-` for stdin) extracts only the HTML document from pasted chat text, validates, and asks before writing. `--commit` and `--push` exist but are opt-in: the tool never publishes on its own. The inbox lets a pull request carry raw HTML that a workflow converts, so a phone or a machine without the repo can contribute.
+- **Why:** the slow part of the old flow was getting code out of a chat window and into a file. Both routes use the same pipeline as `shelf add`, so there is one set of rules, not three.
+- **Rejected:** a token in the browser (any artifact on the same origin could read it), auto-merge of inbox PRs (the human look at the PR is the safety check), and a hosted ingestion service (violates "no backend").
+- **Trade-offs:** the inbox commits before it scans (documented in security.md; the clipboard route does not); bot commits made with the default token do not start other workflows, so the ingest job validates and builds itself; there is no live preview of a PR on a single GitHub Pages site.

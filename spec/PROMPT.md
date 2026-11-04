@@ -63,6 +63,8 @@ SELF-CHECK
 ## After the AI replies
 
 ```bash
-./shelf add my-app.html          # asks for anything missing, validates, creates artifacts/<slug>/
-./shelf preview my-app           # look at it in the real gallery
+python shelf add --clipboard     # copy the code block (or the whole reply), then run this
+python shelf preview <slug>      # look at it in the real gallery
 ```
+
+No computer handy? Paste the HTML into a new `inbox/anything.html` on GitHub in a pull request; see [`../inbox/README.md`](../inbox/README.md).
