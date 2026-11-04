@@ -52,8 +52,15 @@ def short_code_problem(code: object) -> str | None:
 
 KINDS = ("app", "presentation", "doc", "game", "other")
 STORAGE_VALUES = ("none", "local")
+STATUS_VALUES = ("experiment", "finished")
+THUMBNAIL_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
+THUMBNAIL_MAX_BYTES = 2_000_000
+WHY_MAX = 400
 REQUIRED_FIELDS = ("title", "description", "created", "tool", "kind")
-OPTIONAL_FIELDS = ("tags", "storage", "network", "draft", "notes", "short", "install", "color")
+OPTIONAL_FIELDS = (
+    "tags", "storage", "network", "draft", "notes", "short", "install", "color",
+    "featured", "status", "why", "updated", "source", "thumbnail", "aliases",
+)
 KNOWN_FIELDS = REQUIRED_FIELDS + OPTIONAL_FIELDS
 
 # File names the build writes into installable artifacts; authors must not use them.
@@ -198,6 +205,8 @@ class _Page(HTMLParser):
         self.refs: list[tuple[str, str, int]] = []  # (tag, url, line)
         self.inline_styles: list[tuple[str, int]] = []
         self.form_actions: list[tuple[str, int]] = []
+        self.meta_refresh: list[tuple[str, int]] = []
+        self.base_hrefs: list[tuple[str, int]] = []
         self._capture: dict | None = None
 
     # -- helpers
@@ -220,6 +229,10 @@ class _Page(HTMLParser):
             self.has_title_tag = True
         elif tag == "meta" and a.get("name", "").lower() == "viewport":
             self.viewport = a.get("content", "")
+        elif tag == "meta" and a.get("http-equiv", "").lower() == "refresh":
+            self.meta_refresh.append((a.get("content", ""), line))
+        elif tag == "base" and a.get("href"):
+            self.base_hrefs.append((a["href"], line))
         elif tag == "script":
             if a.get("id") == "shelf-meta":
                 self._capture = {"kind": "meta", "line": line, "in_head": self._in_head and not self._seen_body,
@@ -370,7 +383,77 @@ def _check_metadata(res: Result, page: _Page) -> dict | None:
         res.error("META-TYPE", '"install" must be true or false.', line=line)
     if "color" in data and not (isinstance(data["color"], str) and COLOR_RE.match(data["color"])):
         res.error("META-COLOR", f'"color" must be a hex colour such as "#d64933"; got {data["color"]!r}.', line=line)
+    _check_optional_metadata(res, data, line)
     return data
+
+
+def _parse_date(value: object) -> _dt.date | None:
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return None
+    try:
+        return _dt.date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def url_problem(url: object) -> str | None:
+    """Why `url` is not an acceptable http(s) address, or None."""
+    if not isinstance(url, str) or not url.strip():
+        return "must be a non-empty string"
+    if url != url.strip() or any(ch.isspace() for ch in url):
+        return "must not contain whitespace"
+    parts = urlparse(url)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return "must be an http:// or https:// address"
+    if len(url) > 2000:
+        return "is longer than 2000 characters"
+    return None
+
+
+def _check_optional_metadata(res: Result, data: dict, line: int) -> None:
+    """Fields added in spec v0.3. All optional; old artifacts never need them."""
+    if "featured" in data and not isinstance(data["featured"], bool):
+        res.error("META-TYPE", '"featured" must be true or false.', line=line)
+    if "status" in data and data["status"] not in STATUS_VALUES:
+        res.error("META-STATUS", f'"status" must be one of {", ".join(STATUS_VALUES)}; got {data["status"]!r}.', line=line)
+    if "why" in data:
+        why = data["why"]
+        if not isinstance(why, str) or not why.strip():
+            res.error("META-TYPE", '"why" must be a non-empty string.', line=line)
+        elif len(why) > WHY_MAX:
+            res.error("META-LENGTH", f'"why" is {len(why)} characters; the limit is {WHY_MAX}.', line=line)
+    if "updated" in data:
+        updated = _parse_date(data["updated"])
+        if updated is None:
+            res.error("META-DATE", f'"updated" must be a real date as YYYY-MM-DD, got {data["updated"]!r}.', line=line)
+        else:
+            created = _parse_date(data.get("created"))
+            if created and updated < created:
+                res.error("META-DATE", f'"updated" ({data["updated"]}) is before "created" ({data["created"]}).', line=line)
+            if updated > _dt.date.today():
+                res.warn("META-DATE", f'"updated" ({data["updated"]}) is in the future.', line=line)
+    if "source" in data and (why := url_problem(data["source"])):
+        res.error("META-SOURCE", f'"source" {why}; got {data["source"]!r}.', line=line)
+    if "thumbnail" in data:
+        t = data["thumbnail"]
+        if not isinstance(t, str) or not t.strip():
+            res.error("META-TYPE", '"thumbnail" must be a file name inside the artifact folder.', line=line)
+        elif "/" in t or "\\" in t or t.startswith(".") or not t.lower().endswith(THUMBNAIL_SUFFIXES):
+            res.error(
+                "META-THUMBNAIL",
+                f'"thumbnail" must be a plain file name ending in {", ".join(THUMBNAIL_SUFFIXES)} (no folders); got {t!r}.',
+                line=line,
+            )
+    if "aliases" in data:
+        a = data["aliases"]
+        if not isinstance(a, list) or not all(isinstance(x, str) for x in a):
+            res.error("META-TYPE", '"aliases" must be a list of earlier slugs.', line=line)
+        else:
+            for alias in a:
+                if not SLUG_RE.match(alias):
+                    res.error("META-ALIASES", f'"aliases" entry {alias!r} is not a valid slug.', line=line)
+            if len(set(a)) != len(a):
+                res.error("META-ALIASES", '"aliases" lists the same slug twice.', line=line)
 
 
 def _check_html(res: Result, page: _Page) -> None:
@@ -563,6 +646,73 @@ def _check_install(res: Result, root: Path, meta: dict) -> None:
             )
 
 
+def _check_thumbnail_file(res: Result, root: Path, meta: dict) -> None:
+    name = meta.get("thumbnail")
+    if not isinstance(name, str) or "/" in name or "\\" in name or not name.lower().endswith(THUMBNAIL_SUFFIXES):
+        return  # reported by the metadata rules
+    path = root / name
+    if not path.is_file():
+        res.error("META-THUMBNAIL", f'"thumbnail" file {name!r} does not exist in the artifact folder.')
+    elif path.is_symlink():
+        res.error("META-THUMBNAIL", f'"thumbnail" file {name!r} must not be a symbolic link.')
+    elif path.stat().st_size > THUMBNAIL_MAX_BYTES:
+        res.warn("META-THUMBNAIL", f'"thumbnail" file {name!r} is {path.stat().st_size // 1000} KB; keep it under {THUMBNAIL_MAX_BYTES // 1000} KB.')
+
+
+# Code that sends a visitor somewhere else, or reaches out of its own page.
+# Validation cannot make arbitrary JavaScript safe (see docs/security.md); these
+# rules make the common abuse patterns visible in review.
+NAVIGATION_PATTERNS = [
+    (re.compile(r"\b(?:window\s*\.\s*)?(?:top|parent)\s*\.\s*location\b"), "navigates the parent or top window"),
+    (re.compile(r"\blocation\s*(?:\.\s*(?:href|assign|replace)\s*(?:=|\()|\s*=)\s*[\"'`]?\s*(?:https?:)?//"), "navigates to an external address"),
+    (re.compile(r"\bwindow\s*\.\s*open\s*\(\s*[\"'`]\s*(?:https?:)?//"), "opens an external address"),
+]
+REACH_PATTERNS = [
+    (re.compile(r"\b(?:window\s*\.\s*)?(?:top|parent)\s*\.\s*(?:document|postMessage|frames)\b"), "reaches into the parent or top window"),
+    (re.compile(r"\beval\s*\(|\bnew\s+Function\s*\("), "evaluates strings as code"),
+]
+
+
+def _check_security(res: Result, page: _Page, files: dict[str, str]) -> None:
+    for content, line in page.meta_refresh:
+        m = re.search(r"url\s*=\s*['\"]?\s*([^'\";]+)", content, re.I)
+        if m and _classify_ref(m.group(1))[0] == "remote":
+            res.error("SEC-REDIRECT", f'<meta http-equiv="refresh"> sends visitors to {m.group(1).strip()}; redirects are not allowed.', line=line)
+    for href, line in page.base_hrefs:
+        if _classify_ref(href)[0] == "remote":
+            res.error("SEC-BASE", f'<base href="{href}"> would load every relative file from another host.', line=line)
+    for fname, text in files.items():
+        if Path(fname).suffix.lower() not in (".html", ".htm", ".js", ".mjs"):
+            continue
+        for pat, label in NAVIGATION_PATTERNS:
+            if m := pat.search(text):
+                res.warn("SEC-NAVIGATE", f"Script {label}. Check this is intended before publishing.", file=fname, line=_line_of(text, m.start()))
+        for pat, label in REACH_PATTERNS:
+            if m := pat.search(text):
+                res.warn("SEC-REACH", f"Script {label}. Check this is intended before publishing.", file=fname, line=_line_of(text, m.start()))
+
+
+def crosscheck(results: list[Result]) -> list[str]:
+    """Problems that only show up when artifacts are compared with each other.
+
+    Returns readable messages. Slugs and aliases share the URL space
+    `artifacts/<name>/`, so none may repeat.
+    """
+    owners: dict[str, list[str]] = {}
+    for r in results:
+        owners.setdefault(r.slug, []).append(f"artifact {r.slug!r}")
+        aliases = (r.metadata or {}).get("aliases")
+        if isinstance(aliases, list):
+            for alias in aliases:
+                if isinstance(alias, str):
+                    owners.setdefault(alias, []).append(f"alias of {r.slug!r}")
+    return [
+        f"The address artifacts/{name}/ is claimed more than once: {', '.join(who)}."
+        for name, who in sorted(owners.items())
+        if len(who) > 1
+    ]
+
+
 def _check_secrets(res: Result, files: dict[str, str]) -> None:
     for fname, text in files.items():
         for pat, label in SECRET_PATTERNS:
@@ -663,9 +813,14 @@ def validate_artifact(path: str | Path) -> Result:
         network = [n.lower() for n in net if isinstance(n, str)] if isinstance(net, list) else []
         _check_behaviour(res, files, meta)
         _check_install(res, root, meta)
+        _check_thumbnail_file(res, root, meta)
+        aliases = meta.get("aliases")
+        if isinstance(aliases, list) and slug in aliases:
+            res.error("META-ALIASES", f'"aliases" contains the artifact\'s own slug {slug!r}.')
         if meta.get("kind") == "presentation":
             _check_presentation(res, files, page)
     _check_refs(res, page, network, root)
+    _check_security(res, page, files)
     # Local script/style files can also pull remote resources.
     for fname, text in files.items():
         if fname.endswith(".css"):
@@ -729,16 +884,21 @@ def main(argv: list[str] | None = None) -> int:
     artifacts_dir = Path(args.artifacts_dir) if args.artifacts_dir else repo / "artifacts"
     targets = [Path(p) for p in args.paths] if args.paths else discover(artifacts_dir)
     results = [validate_artifact(t) for t in targets]
+    collisions = crosscheck(results)
 
-    if args.json:
+    if args.json:  # same shape as before; collisions go to stderr and the exit code
         print(json.dumps([
             {"slug": r.slug, "ok": r.ok, "draft": r.draft, "metadata": r.metadata,
              "issues": [i.to_dict() for i in r.issues]} for r in results
         ], indent=2))
+        for problem in collisions:
+            print(f"error: {problem}", file=sys.stderr)
     else:
         print(_format(results, color=sys.stdout.isatty()))
+        for problem in collisions:
+            print(f"error: {problem}")
 
-    failed = any(not r.ok for r in results) or (args.strict and any(r.warnings for r in results))
+    failed = bool(collisions) or any(not r.ok for r in results) or (args.strict and any(r.warnings for r in results))
     return 1 if failed else 0
 
 

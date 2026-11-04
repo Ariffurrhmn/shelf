@@ -1,198 +1,197 @@
 <div align="center">
 
-# 📚 Shelf
+# Shelf
 
-**A personal shelf for small HTML apps, tools, and presentations.**
-Kept in one repo, checked against a spec, and published as a gallery I can open by link from anywhere.
+**A permanent home for the small things you make with AI.**
+Apps, games, slide decks and experiments, kept in one repo, checked against a spec, and published as a fast, searchable gallery you can share by link.
 
-![Status](https://img.shields.io/badge/status-deployable-green)
-![Hosting](https://img.shields.io/badge/hosting-static%20pages-blue)
-![Validator](https://img.shields.io/badge/validator-Python%20stdlib-informational)
-![UI](https://img.shields.io/badge/gallery-React%20%2B%20shadcn%2Fui-informational)
+[**Live site →**](https://ariffurrhmn.github.io/shelf/)
+
+![Shelf gallery, light theme](docs/screenshots/gallery-light.png)
 
 </div>
 
-> **Status:** Live at <https://ariffurrhmn.github.io/shelf/>. Working and deployable. The spec, validator, build script, gallery and Pages workflow are implemented. It ships with three sample artifacts; replace them with real ones.
-
 ---
 
-## 😩 The problem
+## Why it exists
 
-I make a lot of small things with AI tools: a one-page calculator, a throwaway game, a slide deck for a talk. Each one is a single HTML file that comes out of a chat window. Then it gets thrown away, or it ends up in a downloads folder, a chat history, or some tool's own preview pane. A few weeks later I can't find it, and if I need it on another machine I'm out of luck.
+I make a lot of small things in conversations with Claude and ChatGPT: a one-page calculator, a throwaway game, a deck for a talk. Each one is a single HTML file that comes out of a chat window, and then it is scattered across chat history, downloads folders and preview panes. A few weeks later I cannot find it, and on another machine I am out of luck.
 
-What I want is simple: every artifact in one place, in a consistent shape, reachable by a link.
+Shelf gives each of them a permanent, organised, good-looking home, reachable by a short link, and makes getting a new one in take about a minute.
 
-## 🧭 What Shelf is (and isn't)
+It is a personal project, built for one author. It is not a platform: no accounts, no database, no server.
 
-Shelf is a personal artifact host and gallery. It keeps my artifacts in one repository, validates each one against a small spec, generates a gallery site with thumbnails, and deploys it as static pages. A push is a deploy.
+## What you get
 
-It is just for me. It is shown on GitHub and on my portfolio site as a proof of concept that this can be built.
+- **A gallery worth showing off.** Editorial design, light and dark themes, image-first cards, featured projects, and a details view with the why, the notes and the technical facts.
+- **Fast discovery.** Search (press `/`), category, tag and "installable" filters, four sort orders, shareable filtered URLs.
+- **Publishing in one command.** `python shelf add my-app.html` validates, names, files and describes an artifact, with nothing half-written if it fails.
+- **Permanent links.** Short links like `…/shelf/74ng`, redirects for renamed projects, and a CI check that fails if a published link would stop working.
+- **Sharing that looks right.** Open Graph and Twitter cards on every short link, a social preview image, sitemap and robots.
+- **Installable apps.** Mark an artifact `install: true` and it becomes an offline app on desktop or phone.
+- **Safer by default.** A browser-enforced network policy per artifact, secret scanning, request-limited screenshots, least-privilege CI. See [Security](#security-and-its-limits) for what is *not* covered.
 
-| Shelf is | Shelf is not |
+<p align="center">
+  <img src="docs/screenshots/details.png" width="62%" alt="Project details dialog" />
+  <img src="docs/screenshots/mobile.png" width="22%" alt="Mobile layout" />
+</p>
+
+## Quick start
+
+Requires Python 3.9+ (standard library only). Node 18+ is needed to build the gallery and make thumbnails.
+
+```bash
+git clone https://github.com/ariffurrhmn/shelf && cd shelf
+(cd gallery && npm ci)                 # once
+python shelf doctor                    # checks your setup
+python shelf preview                   # builds the site and serves http://127.0.0.1:8000/shelf/
+```
+
+### Add a creation
+
+```bash
+python shelf prompt                    # give this to Claude / ChatGPT before you ask for the app
+python shelf add my-app.html           # asks for anything missing, validates, files it
+python shelf preview my-app            # see it in the real gallery
+git add artifacts/my-app && git commit -m "Add my app" && git push
+```
+
+Non-interactive (scripts, CI):
+
+```bash
+python shelf add my-app.html --yes --title "Focus Timer" --category app \
+  --tags productivity,timer --tool claude --description "A 25-minute focus timer."
+```
+
+The full walkthrough, all flags and troubleshooting are in [`docs/ai-workflow.md`](docs/ai-workflow.md).
+
+## Commands
+
+| Command | What it does |
 | --- | --- |
-| A personal tool for one person | A platform |
-| A repo of static files | A service with accounts |
-| Plain pages served from static hosting | Cloud storage for user data |
-| Checked by a validator | Moderated, because I am the only author |
+| `shelf add <file\|folder>` | Import HTML as a new artifact. `--dry-run`, `--fix`, `--force`, `--thumbnail`, metadata flags. |
+| `shelf validate [slug…]` | Check against the spec. `--strict` fails on warnings; `--json` for tools. |
+| `shelf list` | The collection at a glance (`--json`). |
+| `shelf preview [slug]` | Build and serve under `/shelf/` like GitHub Pages. `--raw` serves `artifacts/` instantly. |
+| `shelf rename <old> <new>` | Rename without breaking the old address or short link. |
+| `shelf links [--compare REF]` | List short links; check nothing published at `REF` disappeared. |
+| `shelf doctor` | Check Python, Node, dependencies, artifacts and link plan. |
+| `shelf prompt` | Print the instructions to give an AI assistant. |
 
-## ⚙️ How it works
+`shelf` never pushes or deploys. Publishing is a `git push` you do yourself.
 
-Shelf has five pieces:
+## Artifact metadata
 
-| # | Piece | What it does |
-| --- | --- | --- |
-| 1 | **Spec** | The rules an artifact must follow. |
-| 2 | **Paste-in prompt** | The spec written as a prompt I give any AI session, so new artifacts come out conformant. |
-| 3 | **Validator** | A CLI that checks each artifact against the spec and fails with readable errors. |
-| 4 | **Build script** | Validates, takes a screenshot of each artifact for a thumbnail, generates the gallery, and writes a short link for each artifact. |
-| 5 | **Deploy** | Publishes the generated site as static pages on a subdomain of my portfolio. |
+Each artifact is `artifacts/<slug>/index.html` with a JSON block in `<head>`. Five fields are required; everything else is optional, so older artifacts keep working.
+
+```html
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Focus Timer",
+  "description": "A 25-minute focus timer with a soft chime.",
+  "created": "2026-10-20",
+  "tool": "Claude",
+  "kind": "app",
+
+  "tags": ["productivity", "timer"],
+  "status": "finished",
+  "why": "I kept losing track of my breaks.",
+  "featured": true,
+  "storage": "local",
+  "network": [],
+  "install": true
+}
+</script>
+```
+
+| Field | Notes |
+| --- | --- |
+| `title`, `description`, `created`, `tool`, `kind` | Required. `kind` is the category: `app`, `game`, `presentation`, `doc`, `other`. |
+| `tags`, `status`, `why`, `notes`, `featured`, `updated`, `source` | Optional presentation fields. Nothing is featured unless you say so. |
+| `storage`, `network` | What the artifact uses. **Declare it honestly: the browser enforces `network`.** |
+| `install`, `color` | Installable offline app. |
+| `thumbnail` | Your own cover image (file in the folder) instead of the automatic screenshot. |
+| `short`, `aliases` | Your own short-link code; earlier slugs that must keep working. |
+| `draft` | Keep it off the public site (it is still in the public repo). |
+
+Complete reference with limits and an example: [`spec/METADATA.md`](spec/METADATA.md). Rules: [`spec/SPEC.md`](spec/SPEC.md).
+
+## How it works
 
 ```mermaid
 flowchart LR
-    A["spec/SPEC.md"] --> B["spec/PROMPT.md"]
-    B --> C["AI session"]
-    C --> D["artifacts/&lt;slug&gt;/index.html"]
-    D --> E{"Validator"}
-    E -- "fails" --> F["Readable errors"]
-    E -- "passes" --> G["Build: thumbnails + gallery"]
-    G --> H["site/"]
-    H --> I["Deploy on push"]
+    AI["AI conversation"] --> F["my-app.html"]
+    F --> ADD["shelf add"]
+    ADD --> V{"validate"}
+    V -- "errors" --> X["readable fixes, nothing written"]
+    V -- "ok" --> R["artifacts/&lt;slug&gt;/"]
+    R --> B["build: gallery, CSP, thumbnails, redirects, sitemap"]
+    B --> S["site/ on GitHub Pages"]
+    S --> L["short link to share"]
 ```
-
-The validator, build script and gallery are implemented. See [Getting started](#-getting-started).
-
-## 📐 The spec in brief
-
-The full text is in [`spec/SPEC.md`](spec/SPEC.md). In short, an artifact:
-
-- 📁 is a folder `artifacts/<slug>/` with an `index.html` entry point, ideally one self-contained file;
-- 📌 has no build step, and loads external scripts only from CDNs with an exact pinned version;
-- 🏷️ carries a JSON metadata block in its head (fields are in [`spec/METADATA.md`](spec/METADATA.md));
-- 🔒 stores nothing and makes no network requests unless its metadata says so;
-- 🔑 contains no API keys, tokens, or personal data;
-- 📱 has a `lang` attribute, a viewport meta tag, a title, and a layout that works at phone width;
-- 🎞️ if it is a presentation, supports arrow keys and space, `F` for fullscreen, and prints one slide per page;
-- 📲 can set `install: true` to be installed as an offline app on desktop or phone (the build adds the PWA files);
-- 🚧 can be marked `draft: true` to keep it out of the build and the public site.
-
-## 📋 The paste-in prompt workflow
-
-```mermaid
-flowchart LR
-    A["1. Open an AI session"] --> B["2. Paste spec/PROMPT.md"]
-    B --> C["3. Describe the artifact"]
-    C --> D["4. Answer metadata questions"]
-    D --> E["5. Get one index.html + self-check"]
-    E --> F["6. Save as artifacts/&lt;slug&gt;/"]
-    F --> G["7. Validate and push"]
-```
-
-The prompt is in [`spec/PROMPT.md`](spec/PROMPT.md). The session asks me for any metadata it is missing instead of guessing.
-
-## 🔗 Short links
-
-An artifact's real address is long: `<user>.github.io/shelf/artifacts/<slug>/`. Every published artifact also gets a short one that I can type or put on a slide:
-
-```text
-https://ariffurrhmn.github.io/shelf/74ng     →  the Pomodoro timer
-https://ariffurrhmn.github.io/shelf/link     →  the URL shortener (its own code: "short": "link")
-```
-
-- **Automatic:** a stable 4-character code from the slug, with no look-alike characters (no `i`, `l`, `o`, `0`, `1`). Set `"short": "kafka"` in the metadata for one you can say aloud.
-- **Any address:** `links.json` maps a code to any `http(s)` URL, which makes Shelf a general URL shortener. The [`url-shortener`](artifacts/url-shortener/index.html) artifact helps write the entries.
-- **See it before publishing:** `python tools/build/shortlinks.py <slug>`. The gallery has a copy button on every card, and each CI run lists all links in its summary.
-- **How:** Shelf is static, so the build writes a tiny redirect page per code (`/<code>/index.html`). `/<code>#4` forwards the `#4`, so a link can open slide 4. A clash between two codes fails the build; nothing is renumbered silently.
-- **Shorter still:** set `SHELF_CNAME` to a short domain such as `go.example.com` and the link becomes `go.example.com/74ng`.
-
-Details are in [`spec/METADATA.md`](spec/METADATA.md#short-links) and [`docs/decisions.md`](docs/decisions.md#short-links).
-
-## 🗂️ Repository structure
 
 ```text
 shelf/
-├── artifacts/   One folder per artifact: artifacts/<slug>/index.html
+├── artifacts/   One folder per artifact
+├── shelf        The CLI launcher (python shelf …)
 ├── links.json   Extra short links: "code": "https://..."
-├── spec/        The spec, the metadata reference, and the paste-in prompt
-├── gallery/     The gallery UI (Vite, React, Tailwind, shadcn/ui)
-├── tools/
-│   ├── validate/   The validator and its tests
-│   └── build/      The build script, short links, thumbnails and tests
-├── site/        Generated output (git-ignored, built by CI)
-├── docs/        Architecture, decisions, deployment, security, roadmap
-└── .github/     The validate, build and deploy workflow
+├── spec/        Spec, metadata reference, paste-in AI prompt
+├── gallery/     The UI (Vite, React, Tailwind) with its tests
+├── tools/       cli/ validate/ build/ (Python, plus Node for thumbnails and e2e)
+├── docs/        Architecture, decisions, security, deployment, AI workflow, roadmap
+└── .github/     The test, build and deploy workflow
 ```
 
-## 🧰 Tech
+Architecture notes: [`docs/architecture.md`](docs/architecture.md). Decisions and trade-offs: [`docs/decisions.md`](docs/decisions.md).
 
-| Area | Choice |
+## Thumbnails
+
+The build screenshots every artifact in headless Chromium (1280×800 WebP plus a 640 px copy), after the page has loaded, fonts are ready and the picture has stopped changing. Requests outside the artifact's declared hosts are blocked, blank captures are rejected, and results are cached by content so unchanged artifacts are not re-rendered.
+
+Limits: an app that needs a click, a login or an undeclared network call shows its starting state or a placeholder. Give those a `thumbnail` image (`shelf add … --thumbnail shot.png`). Locally you need `cd tools/build && npm ci && npx playwright install chromium` (or set `SHELF_CHROMIUM`); without them the gallery shows placeholders and everything else still works.
+
+## Tests
+
+```bash
+python -m unittest discover -s tools/validate/tests    # validator and metadata schema
+python -m unittest discover -s tools/build/tests       # build, CSP, SEO, aliases, short links
+python -m unittest discover -s tools/cli/tests         # CLI behaviour and safety
+(cd gallery && npm run typecheck && npm test)          # types; search, filter, sort, URL logic
+python tools/build/build.py --no-thumbnails            # production build
+(cd tools/build && npm ci && npm run e2e)              # browser tests against site/
+```
+
+## Deploying
+
+A push to `main` runs the tests, validates, builds and publishes to GitHub Pages. Set **Settings → Pages → Source** to **GitHub Actions** once. A custom domain or a short domain for shorter links is one repository variable (`SHELF_CNAME`). Details: [`docs/deployment.md`](docs/deployment.md).
+
+## Security and its limits
+
+Shelf scans for secrets, requires artifacts to declare storage and network use, and then **enforces the declared network list in the browser** with a Content-Security-Policy on every served artifact. Screenshots run with a request allowlist, and CI has read-only permissions and no secrets.
+
+What this does **not** do: all artifacts are served from one origin, so a hostile artifact could read another artifact's browser storage or redirect the page. Treat Shelf as *trusted publishing*: publish what you wrote or have read. Isolating untrusted artifacts needs a separate origin, which is documented but not built. The full model, what is and is not protected, and safe iframe embedding: [`docs/security.md`](docs/security.md).
+
+## Accessibility and performance
+
+Built toward WCAG 2.2 AA: colour tokens are contrast-checked in both themes (`gallery/scripts/check-contrast.mjs`), full keyboard use, a skip link, one visible focus style, focus-trapped dialog that returns focus to the button that opened it, reduced-motion support, 44 px touch targets on touch screens, and screen-reader announcements for result counts and copied links. This has been tested with automated browser checks, not with a screen reader or a formal audit.
+
+Measured on the built site in headless Chromium (no throttling): gallery JS 93 KB gzip, CSS 7 KB gzip, two self-hosted font files (51 KB), thumbnails 5–15 KB each, layout shift 0.002–0.007, first contentful paint about 150–180 ms. Filtering 500 projects re-renders in about 200 ms. Numbers on real devices and networks will differ.
+
+## Troubleshooting
+
+| Problem | Try |
 | --- | --- |
-| Validator and build script | Python 3.9+, standard library only |
-| Gallery UI | React, Tailwind CSS v4, shadcn/ui, built with Vite |
-| Thumbnails | Playwright (best effort) |
-| Hosting | GitHub Pages, from `main`; any static host works |
+| Gallery says it could not load the list | Serve over HTTP (`python shelf preview`); opening `index.html` from disk cannot fetch `artifacts.json`. |
+| `shelf add` rejects a file | Read the hints under the errors; `--fix` repairs missing `lang`/viewport; `--storage local` and `--network …` declare usage. |
+| Thumbnails are placeholders | Run `python shelf doctor`; install Playwright's Chromium (see Thumbnails). Add a `thumbnail` for pages that need interaction. |
+| A short link clashes | The build names both owners; set `short` on one artifact. Codes are never renumbered silently. |
+| Preview port busy | `python shelf preview --port 8001`. |
+| An old link 404s after a rename | Use `python shelf rename`; `python shelf links --compare origin/main` shows what broke. |
 
-Decisions are logged in [`docs/decisions.md`](docs/decisions.md).
+## Roadmap
 
-## 🔐 Security and privacy
+See [`docs/roadmap.md`](docs/roadmap.md). Next: turn on Pages, add real projects (see [`docs/collection.md`](docs/collection.md)), choose a final domain.
 
-The repo and the site are public, so I treat everything in them as public.
+## Repository About and topics
 
-- 🚧 **Draft flag:** `draft: true` keeps an artifact out of the build and the site. It is still in the repo, so drafts are not private.
-- 🔎 **Secret scan:** the validator scans every file for credentials and email addresses and fails the build.
-- 📦 **Sandboxed embeds:** artifacts embedded in my portfolio site should go in an iframe with the `sandbox` attribute, so a buggy artifact can't affect the host page.
-- 🫥 **Ephemeral by default:** artifacts keep no data and send nothing to a server unless their metadata declares it.
-
-More in [`docs/security.md`](docs/security.md).
-
-## 📲 Install as an app
-
-Artifacts with `install: true` show up in the gallery's **Install to your device** section. Chrome, Edge and Android offer an install prompt; on iPhone and iPad use Share, then Add to Home Screen. Installed artifacts open in their own window and work offline, which is what makes the conference use case below safe. The build adds the manifest, icons and service worker; see [SPEC section 10](spec/SPEC.md).
-
-## 🎤 The use case
-
-> I'm at a conference and I'm handed a room machine I've never used. My slides are an HTML presentation I made weeks ago. I don't want to sign in to anything or plug in a drive. I open a browser, go to the Shelf address, tap the presentation, and press `F`. Arrow keys move through the slides. The same link works from my phone if the room machine fails.
-
-## 🗺️ Roadmap
-
-- [x] Spec v0
-- [x] Validator
-- [x] Build script and thumbnails
-- [x] Gallery and deploy workflow
-- [x] Short links
-- [x] Installable artifacts (PWA) with offline use
-- [ ] Turn on GitHub Pages
-- [ ] First 8-12 curated artifacts, each with a short note
-- [ ] Optional, later: a publish CLI
-
-More detail in [`docs/roadmap.md`](docs/roadmap.md).
-
-## 🚀 Getting started
-
-**Add an artifact**
-
-1. Paste [`spec/PROMPT.md`](spec/PROMPT.md) into an AI session and describe what you want.
-2. Save the reply as `artifacts/<slug>/index.html`.
-3. Check it: `python tools/validate/shelf_validate.py`
-4. Check the short link it will get: `python tools/build/shortlinks.py <slug>`
-5. Push. The workflow validates, builds and deploys.
-
-**Build and preview locally**
-
-```bash
-cd gallery && npm ci && cd ..
-python tools/build/build.py --no-thumbnails
-python -m http.server 8000 --directory site
-```
-
-Then open <http://localhost:8000>. Drop `--no-thumbnails` once Playwright is set up (see [`docs/deployment.md`](docs/deployment.md)).
-
-**Run the tests**
-
-```bash
-python -m unittest discover -s tools/validate/tests
-python -m unittest discover -s tools/build/tests
-```
-
-**Publish**
-
-In the repository settings, set **Pages → Source** to **GitHub Actions**, then push to `main`. Full steps are in [`docs/deployment.md`](docs/deployment.md).
+Suggested text and topics are in [`docs/collection.md`](docs/collection.md#repository-about-and-topics).

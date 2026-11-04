@@ -24,7 +24,7 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 
 - **Status:** decided (replaces the earlier "Python for tooling" entry)
 - The validator and build script are Python 3.9+ using only the standard library, so they run anywhere with no install step. The gallery UI is React, Tailwind CSS v4 and shadcn/ui (Vite). Thumbnails use Playwright from Node.
-- **Why:** the validator is the part that must be easy to run and trust, so it has no dependencies. The gallery needs a UI toolkit, and shadcn/ui was the chosen one. Playwright's Node package is the same library the browser tooling already uses, so thumbnails need no second runtime.
+- **Why:** the validator is the part that must be easy to run and trust, so it has no dependencies. The gallery needs a UI toolkit, and shadcn/ui was the chosen one. Playwright's Node package is the same library the browser tooling already uses, so thumbnails need no second runtime. The CLI (`shelf`) is Python for the same reason as the validator: it runs anywhere with no install step.
 
 ## Host: GitHub Pages
 
@@ -53,7 +53,7 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 ## Thumbnails are best effort
 
 - **Status:** decided
-- The build tries to screenshot each artifact. If Playwright or a browser is unavailable, or one artifact fails to load, the gallery shows an icon placeholder and the build still succeeds.
+- The build tries to screenshot each artifact. If Playwright or a browser is unavailable, or one artifact fails to load or renders blank, the gallery shows a placeholder and the build still succeeds. See "Thumbnail pipeline" below.
 - **Why:** a screenshot must never block publishing.
 
 ## Generated output is not committed
@@ -74,3 +74,49 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 - An artifact opts in with `install: true`. The build, not the author, adds a manifest, generated icons and a service worker to the served copy, and injects the tags into the served `index.html`. The source file is not changed and the validator still forbids service workers in artifact code. Each artifact is its own installable app, scoped to its folder. The gallery lists them in an "Install to your device" section; its Install button opens the artifact with `#install`, which shows a one-off install prompt.
 - **Why:** it gives offline use on the room machine or phone with no server, and keeps authors out of service worker code. Injecting into the page itself (not a separate install page) is what iOS needs, because Add to Home Screen works from the page you are on.
 - **Trade-offs:** the served file differs from the source by one block. Per-artifact scopes share one origin, so storage keys must be slug-prefixed. Icons are generated patterns from the slug (stdlib PNG, no Playwright), not drawn artwork. The gallery itself is not a PWA.
+
+## Gallery redesign (Shelf 2.0)
+
+- **Status:** decided
+- Editorial layout with image-first cards; design tokens in CSS variables; Space Grotesk (headings) and Geist (body) self-hosted, latin subset; system monospace for technical metadata. shadcn/ui, Radix toggles, `class-variance-authority`, `tailwind-merge` and `tw-animate-css` were removed; only `@radix-ui/react-dialog` stays, because focus trapping and `aria-modal` are worth not re-implementing.
+- **Why:** the gallery is the product. Fewer dependencies made the JS bundle smaller (about 94 KB gzip, from about 105 KB) and the markup easier to reason about for accessibility.
+- **Trade-off:** no component library to pull new widgets from; each new control is written against the tokens.
+
+## Discovery and links in the URL
+
+- **Status:** decided
+- Filters (`?q=&kind=&tag=&installable=&sort=`) live in the URL and use `replaceState`; the details dialog is `#slug` and uses `pushState`. Only theme and sort are remembered between visits; filters never are.
+- **Why:** shareable, refresh-safe views and a Back button that does what people expect, without a router and with static hosting. Remembering filters would make the site open on a surprising subset of the collection.
+
+## Featured projects
+
+- **Status:** decided
+- `featured: true` in metadata. Featured projects show above the grid only while nothing is filtered, are not repeated in the grid, and the strip is skipped when none or all are featured. Nothing is featured by default.
+
+## Metadata v0.3
+
+- **Status:** decided
+- Added optional `featured`, `status` (`experiment` | `finished`), `why`, `updated`, `source`, `thumbnail`, `aliases`. `kind` remains the category: a second `category` field would only duplicate it. No field is required, so older artifacts load unchanged.
+
+## Permanent links and renames
+
+- **Status:** decided
+- `aliases` keeps old `artifacts/<slug>/` addresses alive with redirect pages. `shelf rename` moves the folder, appends the alias and pins the old automatic short code as `short` (the automatic code is derived from the slug, so it would otherwise change). `shelf links --compare origin/main` runs in CI and fails when a published address or short code would disappear.
+- **Trade-off:** redirect pages cost one extra request; removing an artifact on purpose needs a deliberate choice rather than happening silently.
+
+## Artifact isolation: CSP now, separate origin later
+
+- **Status:** decided, partial by design
+- The build adds a Content-Security-Policy to each served artifact that enforces its declared `network` list. Artifacts are not embedded live in the gallery. A separate origin for untrusted artifacts is documented as the real fix and not built, because it needs a second deployment target and changes installable apps and short links. See [security.md](security.md).
+- **Why:** CSP is cheap, static and actually blocks exfiltration over the network, which is the most likely harm from a bad generation. It does not stop storage or DOM access across artifacts, and the documentation says so.
+
+## Thumbnail pipeline
+
+- **Status:** decided
+- Chromium via Playwright, pages served from a local HTTP server (not `file://`), all requests outside the local server and the artifact's approved hosts aborted. Capture waits for load, fonts and two identical frames. Blank (uniform) captures are rejected. WebP output via the browser's own canvas encoder, at 1280×800 and 640×400, named with a content hash (cache-busting for free) and cached in `.shelf-cache/thumbnails/` by a hash of the artifact's files. `thumbnail` metadata overrides the screenshot but goes through the same resize.
+- **Limits:** apps that need a click, a login, a network call to an undeclared host, or a long start-up show their initial state or a placeholder; use a manual `thumbnail` for those.
+
+## Social previews on static hosting
+
+- **Status:** decided
+- Crawlers ignore client-side meta changes, so the gallery has one high-quality site-level card, and each artifact's short-link page (plain HTML) carries its own Open Graph/Twitter tags with the thumbnail. Share short links for rich previews. The in-gallery `#slug` view cannot have its own preview.

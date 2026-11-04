@@ -6,18 +6,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+# The build job never gets more than read access and holds no secrets, because it opens
+# artifact HTML in a headless browser (thumbnails, end-to-end tests). Only the deploy job
+# can publish, and it only runs for main.
 permissions:
   contents: read
 
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on main half-way through a deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the permanent-link check compares with origin/main
 
       - uses: actions/setup-python@v5
         with:
@@ -31,21 +38,68 @@ jobs:
             gallery/package-lock.json
             tools/build/package-lock.json
 
-      - name: Unit tests
+      - name: Python tests (validator, build, CLI)
         run: |
           python -m unittest discover -s tools/validate/tests
           python -m unittest discover -s tools/build/tests
+          python -m unittest discover -s tools/cli/tests
 
-      - name: Install Playwright browser (for thumbnails)
+      - name: Validate artifacts
+        run: python shelf validate --strict
+
+      - name: Permanent links still work
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        run: |
+          git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main || true
+          if git rev-parse --verify -q origin/main >/dev/null; then
+            python shelf links --compare origin/main
+          else
+            echo "No origin/main to compare with; skipping."
+          fi
+
+      - name: Gallery dependencies
+        working-directory: gallery
+        run: npm ci
+
+      - name: Gallery type check, unit tests, colour contrast
+        working-directory: gallery
+        run: |
+          npm run typecheck
+          npm test
+          node scripts/check-contrast.mjs > /dev/null
+
+      - name: Thumbnail cache
+        uses: actions/cache@v4
+        with:
+          path: .shelf-cache/thumbnails
+          # Keyed by content: unchanged artifacts are not re-rendered. Bump the version in
+          # tools/build/thumbnails.cjs to invalidate everything.
+          key: thumbnails-${{ hashFiles('artifacts/**', 'tools/build/thumbnails.cjs') }}
+          restore-keys: thumbnails-
+
+      - name: Install Playwright browser
         working-directory: tools/build
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Validate and build the site
-        run: python tools/build/build.py --install
+      - name: Build the site (validates again, builds, thumbnails)
+        run: python tools/build/build.py --strict
         env:
           SHELF_CNAME: ${{ vars.SHELF_CNAME }}
+
+      - name: End-to-end tests
+        working-directory: tools/build
+        run: npm run e2e
+
+      - name: Report bundle size
+        run: |
+          {
+            echo "### Gallery bundle"
+            echo '```'
+            ls -l site/assets | awk 'NR>1 {printf "%8d  %s\n", $5, $9}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload site
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

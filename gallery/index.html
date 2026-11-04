@@ -3,20 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="A personal shelf for small HTML apps, tools and presentations." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E" />
-    <title>Shelf</title>
-    <script>
-      (function () {
-        try {
-          var t = localStorage.getItem("shelf-theme");
-          var dark = t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.classList.toggle("dark", dark);
-        } catch (e) {}
-      })();
-    </script>
+    <title>Shelf · Small experiments. Useful creations.</title>
+    <meta name="description" content="A personal digital playground: a growing collection of little apps, creative experiments and interactive ideas, built, collected and shared." />
+    <meta name="theme-color" content="#fafaf8" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="canonical" href="__SHELF_BASE_URL__" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shelf" />
+    <meta property="og:title" content="Shelf · Small experiments. Useful creations." />
+    <meta property="og:description" content="A growing collection of little apps, creative experiments and interactive ideas — built, collected and shared." />
+    <meta property="og:url" content="__SHELF_BASE_URL__" />
+    <meta property="og:image" content="__SHELF_BASE_URL__og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Shelf: small experiments, useful creations." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Shelf · Small experiments. Useful creations." />
+    <meta name="twitter:description" content="A growing collection of little apps, creative experiments and interactive ideas — built, collected and shared." />
+    <meta name="twitter:image" content="__SHELF_BASE_URL__og.png" />
+    <script src="./theme-init.js"></script>
   </head>
   <body>
+    <noscript>Shelf needs JavaScript to show the collection. The projects themselves are listed in <a href="artifacts.json">artifacts.json</a>.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -38,15 +38,29 @@ class TestBuild(unittest.TestCase):
                 (root / "ccc" / "index.html").read_text().replace("2026-01-02", "2026-05-05"), encoding="utf-8"
             )
             results = build.sv.validate_all(root)
-            m = build.build_manifest([r for r in results if not r.draft], {"aaa"}, "https://example.com/r")
+            m = build.build_manifest(
+                [r for r in results if not r.draft],
+                {"aaa": {"src": "thumbnails/aaa-1.webp", "small": "thumbnails/aaa-1-640.webp", "width": 1280, "height": 800}},
+                "https://example.com/r",
+            )
             self.assertEqual([e["slug"] for e in m["artifacts"]], ["ccc", "aaa"])
-            self.assertEqual(m["artifacts"][1]["thumbnail"], "thumbnails/aaa.jpg")
+            self.assertEqual(m["artifacts"][1]["thumbnail"], "thumbnails/aaa-1.webp")
+            self.assertEqual(m["artifacts"][1]["thumbnailSmall"], "thumbnails/aaa-1-640.webp")
             self.assertIsNone(m["artifacts"][0]["thumbnail"])
             self.assertEqual(m["repo"], "https://example.com/r")
 
     def test_entry_defaults(self):
-        e = build.make_entry("s", {"title": "t", "description": "d", "created": "2026-01-01", "tool": "x", "kind": "doc"}, False)
+        e = build.make_entry("s", {"title": "t", "description": "d", "created": "2026-01-01", "tool": "x", "kind": "doc"}, None)
         self.assertEqual((e["storage"], e["network"], e["tags"], e["url"]), ("none", [], [], "artifacts/s/"))
+        self.assertEqual((e["featured"], e["status"], e["why"], e["updated"], e["source"], e["aliases"]), (False, None, None, None, None, []))
+        self.assertIsNone(e["thumbnail"])
+
+    def test_entry_carries_optional_metadata(self):
+        meta = {"title": "t", "description": "d", "created": "2026-01-01", "tool": "x", "kind": "doc", "featured": True,
+                "status": "finished", "why": "because", "updated": "2026-02-02", "source": "https://example.com/c", "aliases": ["old"]}
+        e = build.make_entry("s", meta, None)
+        self.assertEqual((e["featured"], e["status"], e["why"], e["updated"], e["source"], e["aliases"]),
+                         (True, "finished", "because", "2026-02-02", "https://example.com/c", ["old"]))
 
     def test_data_only_build_writes_site(self):
         with tempfile.TemporaryDirectory() as d:
@@ -211,12 +225,16 @@ class TestPwa(unittest.TestCase):
             data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
             self.assertEqual((data["install"], data["icon"], data["color"]), (True, "artifacts/app-one/icon-192.png", "#336699"))
 
-    def test_non_installable_artifact_is_served_unchanged(self):
+    def test_non_installable_artifact_only_gains_the_csp(self):
         with tempfile.TemporaryDirectory() as d:
             rc, root, out = self.built(d, "")
             self.assertEqual(rc, 0)
             dest = out / "artifacts" / "app-one"
-            self.assertEqual((dest / "index.html").read_text(), (root / "app-one" / "index.html").read_text())
+            served = (dest / "index.html").read_text()
+            self.assertIn("Content-Security-Policy", served)
+            source = (root / "app-one" / "index.html").read_text()
+            self.assertEqual(served.replace(served[served.index("<meta http-equiv"):served.index(">", served.index("<meta http-equiv")) + 1], ""), source)
+            self.assertNotIn("Content-Security-Policy", source)  # the source file is never changed
             self.assertEqual(sorted(p.name for p in dest.iterdir()), ["index.html"])
             data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
             self.assertEqual((data["install"], data["icon"], data["color"]), (False, None, None))

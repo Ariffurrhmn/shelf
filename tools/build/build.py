@@ -4,11 +4,13 @@
 Pipeline:
   1. validate every artifact (fails the build on errors)
   2. build the gallery UI (gallery/, Vite) into the output directory
-  3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/,
-     and add PWA files (manifest, icons, service worker) to those with "install": true
-  4. generate thumbnails (best effort, Playwright)
-  5. write a redirect page per short link (see shortlinks.py)
-  6. write <out>/artifacts.json, .nojekyll and an optional CNAME
+  3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/, add a
+     Content-Security-Policy that enforces each artifact's declared network
+     (harden.py), and add PWA files to those with "install": true
+  4. generate thumbnails (best effort, Playwright, cached by content hash)
+  5. write a redirect page per short link, with Open Graph tags, plus a redirect
+     for every alias (old slug) so renamed artifacts keep their links
+  6. write <out>/artifacts.json, robots.txt, sitemap.xml, .nojekyll and an optional CNAME
 
 Usage:
     python tools/build/build.py
@@ -33,15 +35,22 @@ import shelf_validate as sv  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import shortlinks  # noqa: E402
+import harden  # noqa: E402
 import pwa  # noqa: E402
+import seo  # noqa: E402
 
 DEFAULT_REPO_URL = "https://github.com/ariffurrhmn/shelf"
+THUMB_CACHE = Path(os.environ.get("SHELF_CACHE_DIR") or REPO / ".shelf-cache") / "thumbnails"
 
 
-def make_entry(slug: str, meta: dict, has_thumbnail: bool, short: str | None = None) -> dict:
-    """Normalise validated metadata into one manifest entry."""
+def make_entry(slug: str, meta: dict, thumb: dict | None, short: str | None = None) -> dict:
+    """Normalise validated metadata into one manifest entry.
+
+    `thumb` is {"src", "small", "width", "height"} from the thumbnail step, or None.
+    Optional metadata is carried over only when present, so the gallery can
+    tell "not set" from "set to the default"."""
     install = meta.get("install") is True
-    return {
+    entry = {
         "slug": slug,
         "title": meta["title"],
         "description": meta["description"],
@@ -52,21 +61,35 @@ def make_entry(slug: str, meta: dict, has_thumbnail: bool, short: str | None = N
         "storage": meta.get("storage", "none"),
         "network": list(meta.get("network", [])),
         "notes": meta.get("notes"),
+        "why": meta.get("why"),
+        "status": meta.get("status"),
+        "featured": meta.get("featured") is True,
+        "updated": meta.get("updated"),
+        "source": meta.get("source"),
+        "aliases": list(meta.get("aliases", [])),
         "url": f"artifacts/{slug}/",
         "short": short,
-        "thumbnail": f"thumbnails/{slug}.jpg" if has_thumbnail else None,
+        "thumbnail": thumb["src"] if thumb else None,
+        "thumbnailSmall": thumb["small"] if thumb else None,
+        "thumbnailWidth": thumb["width"] if thumb else None,
+        "thumbnailHeight": thumb["height"] if thumb else None,
         "install": install,
         "icon": f"artifacts/{slug}/icon-192.png" if install else None,
         "color": (meta.get("color") or pwa.default_color(slug)) if install else None,
     }
+    return entry
 
 
 def build_manifest(
-    results: list[sv.Result], thumbs: set[str], repo_url: str | None, shorts: dict[str, str] | None = None
+    results: list[sv.Result],
+    thumbs: dict[str, dict] | None,
+    repo_url: str | None,
+    shorts: dict[str, str] | None = None,
 ) -> dict:
+    thumbs = thumbs or {}
     shorts = shorts or {}
     entries = [
-        make_entry(r.slug, r.metadata, r.slug in thumbs, shorts.get(r.slug))
+        make_entry(r.slug, r.metadata, thumbs.get(r.slug), shorts.get(r.slug))
         for r in results
         if r.ok and not r.draft and r.metadata
     ]
@@ -75,6 +98,33 @@ def build_manifest(
     if repo_url:
         manifest["repo"] = repo_url
     return manifest
+
+
+def share_markup(r: sv.Result, entry: dict, base: str) -> str:
+    """Open Graph tags for one artifact's short-link page."""
+    image = entry["thumbnail"] or seo.SITE_IMAGE
+    code = entry["short"] or entry["slug"]
+    return seo.share_tags(
+        title=entry["title"],
+        description=entry["description"],
+        url=seo.absolute(base, code + "/"),
+        image=seo.absolute(base, image),
+    )
+
+
+def thumbnail_jobs(published: list[sv.Result]) -> dict:
+    hosts = list(sv.ALLOWED_CDN_HOSTS) + list(sv.ALLOWED_FONT_HOSTS)
+    return {
+        "cache": str(THUMB_CACHE),
+        "items": [
+            {
+                "slug": r.slug,
+                "override": (r.metadata or {}).get("thumbnail"),
+                "allowHosts": hosts + list((r.metadata or {}).get("network", [])),
+            }
+            for r in published
+        ],
+    }
 
 
 def run(cmd: list[str], cwd: Path, check: bool = True) -> int:
@@ -99,7 +149,10 @@ def main(argv: list[str] | None = None) -> int:
     # 1. validate
     results = sv.validate_all(args.artifacts_dir)
     print(sv._format(results, color=sys.stdout.isatty()))
-    if any(not r.ok for r in results) or (args.strict and any(r.warnings for r in results)):
+    collisions = sv.crosscheck(results)
+    for problem in collisions:
+        print(f"error: {problem}", file=sys.stderr)
+    if collisions or any(not r.ok for r in results) or (args.strict and any(r.warnings for r in results)):
         print("\nBuild stopped: fix the validation errors above.", file=sys.stderr)
         return 1
     published = [r for r in results if not r.draft]
@@ -136,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     for r in published:
         shutil.copytree(r.path, dest_root / r.slug, ignore=shutil.ignore_patterns(".*", "__pycache__"))
     print(f"Copied {len(published)} artifact(s) to {dest_root}")
+    for r in published:
+        harden.harden_artifact(dest_root / r.slug, r.metadata)
+    print(f"Added a Content-Security-Policy to {len(published)} artifact(s)")
     installable = [r for r in published if r.metadata and r.metadata.get("install") is True]
     for r in installable:
         try:
@@ -147,37 +203,59 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Made {len(installable)} artifact(s) installable: {', '.join(r.slug for r in installable)}")
 
     # 4. thumbnails
-    thumbs: set[str] = set()
+    thumbs: dict[str, dict] = {}
     if published and not args.no_thumbnails and shutil.which("node"):
-        slugs = [r.slug for r in published]
         build_tools = REPO / "tools" / "build"
         if args.install and not (build_tools / "node_modules").exists():
             run(["npm", "ci"], build_tools)
-        rc = run(["node", "thumbnails.cjs", str(out), *slugs], build_tools, check=False)
+        jobs_file = out / ".thumbnail-jobs.json"
+        jobs_file.write_text(json.dumps(thumbnail_jobs(published)), encoding="utf-8")
+        try:
+            rc = run(["node", "thumbnails.cjs", str(out), str(jobs_file)], build_tools, check=False)
+        finally:
+            jobs_file.unlink(missing_ok=True)
+        index = out / "thumbnails" / "index.json"
         if rc != 0:
             print("warning: thumbnails were skipped; the gallery will show placeholders.", file=sys.stderr)
-        thumbs = {p.stem for p in (out / "thumbnails").glob("*.jpg")} if (out / "thumbnails").is_dir() else set()
+        if index.is_file():
+            thumbs = json.loads(index.read_text(encoding="utf-8"))
+            index.unlink()
 
-    # 5. short links (after the gallery build, which empties the output folder)
+    # 5. manifest, short links and aliases (after the gallery build, which empties the output folder)
+    base = shortlinks.base_url()
+    site_base = base or shortlinks.DEFAULT_BASE_URL
+    gh = os.environ.get("GITHUB_REPOSITORY")
+    repo_url = f"https://github.com/{gh}" if gh else DEFAULT_REPO_URL
+    manifest = build_manifest(published, thumbs, repo_url, plan.artifacts)
+    entries = {e["slug"]: e for e in manifest["artifacts"]}
+    share = {r.slug: share_markup(r, entries[r.slug], site_base) for r in published if r.slug in entries}
     try:
-        count = shortlinks.write_redirects(out, plan)
+        count = shortlinks.write_redirects(out, plan, share)
+        alias_map = {alias: e["slug"] for e in manifest["artifacts"] for alias in e["aliases"]}
+        n_alias = shortlinks.write_alias_redirects(out, alias_map)
     except shortlinks.ShortLinkError as exc:
         print("\n".join(f"error: {p}" for p in exc.problems), file=sys.stderr)
         return 1
-    rows = shortlinks.describe(plan, {r.slug: r.metadata["title"] for r in published}, shortlinks.base_url())
-    print(f"\nWrote {count} short link(s):\n{shortlinks.format_table(rows)}")
+    rows = shortlinks.describe(plan, {r.slug: r.metadata["title"] for r in published}, base)
+    print(f"\nWrote {count} short link(s) and {n_alias} alias redirect(s):\n{shortlinks.format_table(rows)}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary and rows:
         with open(summary, "a", encoding="utf-8") as fh:
             fh.write(shortlinks.format_markdown(rows))
 
-    # 6. manifest and hosting files
-    gh = os.environ.get("GITHUB_REPOSITORY")
-    repo_url = f"https://github.com/{gh}" if gh else DEFAULT_REPO_URL
-    manifest = build_manifest(published, thumbs, repo_url, plan.artifacts)
+    # 6. hosting and SEO files
     text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     (out / "artifacts.json").write_text(text, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
+    (out / "robots.txt").write_text(seo.robots_txt(site_base), encoding="utf-8")
+    (out / "sitemap.xml").write_text(seo.sitemap_xml(site_base, manifest["artifacts"]), encoding="utf-8")
+    for name in ("index.html", "404.html"):
+        page = out / name
+        if page.is_file():
+            text = seo.inject_site_urls(page.read_text(encoding="utf-8"), site_base)
+            if name == "index.html":
+                text = seo.inject_gallery_csp(text)
+            page.write_text(text, encoding="utf-8")
     if os.environ.get("SHELF_CNAME"):
         (out / "CNAME").write_text(os.environ["SHELF_CNAME"].strip() + "\n", encoding="utf-8")
     if (gallery / "public").is_dir():  # lets `npm run dev` show real data

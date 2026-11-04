@@ -1,28 +1,41 @@
 import { useCallback, useEffect, useState } from "react"
 
-type Theme = "light" | "dark"
+import { readPref, writePref } from "@/lib/storage"
 
-function initial(): Theme {
+type Theme = "light" | "dark"
+const KEY = "shelf-theme"
+
+function current(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
 }
 
+function apply(theme: Theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark")
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#181a20" : "#fafaf8")
+}
+
+/** Follows the system theme until the visitor picks one; the pick is then remembered. */
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(initial)
+  const [theme, setTheme] = useState<Theme>(current)
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark")
-  }, [theme])
+    if (readPref(KEY)) return
+    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const onChange = () => {
+      if (readPref(KEY)) return
+      const next: Theme = mq.matches ? "dark" : "light"
+      apply(next)
+      setTheme(next)
+    }
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [])
 
   const toggle = useCallback(() => {
-    setTheme((t) => {
-      const next: Theme = t === "dark" ? "light" : "dark"
-      try {
-        localStorage.setItem("shelf-theme", next)
-      } catch {
-        /* storage may be unavailable; the choice just will not persist */
-      }
-      return next
-    })
+    const next: Theme = current() === "dark" ? "light" : "dark"
+    apply(next)
+    writePref(KEY, next)
+    setTheme(next)
   }, [])
 
   return { theme, toggle }

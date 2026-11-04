@@ -279,6 +279,105 @@ class TestDrafts(Base):
         self.assertTrue(self.check(page({"draft": True})).ok)
 
 
+class TestSchemaV03(Base):
+    """Optional fields added in spec v0.3. Old artifacts must keep passing unchanged."""
+
+    def test_old_metadata_still_valid(self):
+        self.assertTrue(self.check(page()).ok)
+
+    def test_all_new_fields_valid(self):
+        res = self.check(
+            page({
+                "featured": True, "status": "finished", "why": "I kept losing track of my timers.",
+                "updated": "2026-02-01", "source": "https://claude.ai/chat/abc", "thumbnail": "cover.png",
+                "aliases": ["old-name"],
+            }),
+            extra={"cover.png": "x"},
+        )
+        self.assertTrue(res.ok, [i.message for i in res.errors])
+
+    def test_featured_must_be_boolean(self):
+        self.assertIn("META-TYPE", self.codes(self.check(page({"featured": "yes"})), v.ERROR))
+
+    def test_status_values(self):
+        self.assertIn("META-STATUS", self.codes(self.check(page({"status": "done"})), v.ERROR))
+        self.assertTrue(self.check(page({"status": "experiment"})).ok)
+
+    def test_why_length(self):
+        self.assertIn("META-LENGTH", self.codes(self.check(page({"why": "x" * 401})), v.ERROR))
+
+    def test_updated_validation(self):
+        self.assertIn("META-DATE", self.codes(self.check(page({"updated": "2026-13-01"})), v.ERROR))
+        self.assertIn("META-DATE", self.codes(self.check(page({"updated": "2025-12-31"})), v.ERROR))  # before created
+        self.assertIn("META-DATE", self.codes(self.check(page({"updated": "2999-01-01"})), v.WARNING))
+
+    def test_created_must_be_zero_padded(self):
+        self.assertIn("META-DATE", self.codes(self.check(page({"created": "2026-1-2"})), v.ERROR))
+
+    def test_source_must_be_http_url(self):
+        self.assertIn("META-SOURCE", self.codes(self.check(page({"source": "javascript:alert(1)"})), v.ERROR))
+        self.assertIn("META-SOURCE", self.codes(self.check(page({"source": "example.com/x"})), v.ERROR))
+
+    def test_thumbnail_rules(self):
+        self.assertIn("META-THUMBNAIL", self.codes(self.check(page({"thumbnail": "../x.png"})), v.ERROR))
+        self.assertIn("META-THUMBNAIL", self.codes(self.check(page({"thumbnail": "x.gif"})), v.ERROR))
+        self.assertIn("META-THUMBNAIL", self.codes(self.check(page({"thumbnail": "missing.png"})), v.ERROR))
+
+    def test_aliases_rules(self):
+        self.assertIn("META-ALIASES", self.codes(self.check(page({"aliases": ["Bad_Slug"]})), v.ERROR))
+        self.assertIn("META-ALIASES", self.codes(self.check(page({"aliases": ["a", "a"]})), v.ERROR))
+        self.assertIn("META-ALIASES", self.codes(self.check(page({"aliases": ["demo"]})), v.ERROR))  # own slug
+
+    def test_unknown_field_still_a_warning(self):
+        res = self.check(page({"feautred": True}))
+        self.assertTrue(res.ok)
+        self.assertIn("META-UNKNOWN", self.codes(res, v.WARNING))
+
+    def test_crosscheck_detects_alias_collisions(self):
+        def r(slug, aliases=None):
+            res = v.Result(slug=slug, path=Path(slug))
+            res.metadata = {"aliases": aliases or []}
+            return res
+
+        self.assertEqual(v.crosscheck([r("a"), r("b", ["old"])]), [])
+        self.assertEqual(len(v.crosscheck([r("a"), r("b", ["a"])])), 1)
+        self.assertEqual(len(v.crosscheck([r("a", ["x"]), r("b", ["x"])])), 1)
+
+
+class TestDocsInSync(unittest.TestCase):
+    def test_every_metadata_field_is_documented(self):
+        text = (REPO / "spec" / "METADATA.md").read_text(encoding="utf-8")
+        for field in v.KNOWN_FIELDS:
+            self.assertIn(f"| `{field}` |", text, f"spec/METADATA.md has no table row for {field!r}")
+
+
+class TestSecurityRules(Base):
+    def test_meta_refresh_to_external_is_error(self):
+        res = self.check(page(head='<meta http-equiv="refresh" content="0; url=https://evil.example.org/">'))
+        self.assertIn("SEC-REDIRECT", self.codes(res, v.ERROR))
+
+    def test_meta_refresh_local_is_fine(self):
+        res = self.check(page(head='<meta http-equiv="refresh" content="30">'))
+        self.assertNotIn("SEC-REDIRECT", self.codes(res))
+
+    def test_external_base_href_is_error(self):
+        res = self.check(page(head='<base href="https://evil.example.org/">'))
+        self.assertIn("SEC-BASE", self.codes(res, v.ERROR))
+
+    def test_scripted_navigation_warns(self):
+        for snippet in ('location.href = "https://evil.example.org"', 'top.location = "x"', 'window.open("https://x.example.org")'):
+            res = self.check(page(body=f"<script>{snippet}</script>"))
+            self.assertIn("SEC-NAVIGATE", self.codes(res, v.WARNING), snippet)
+
+    def test_parent_reach_and_eval_warn(self):
+        res = self.check(page(body="<script>parent.postMessage('x','*'); eval('1')</script>"))
+        self.assertIn("SEC-REACH", self.codes(res, v.WARNING))
+
+    def test_ordinary_script_is_quiet(self):
+        res = self.check(page(body="<script>document.title = 'x'; const a = location.hash;</script>"))
+        self.assertFalse({c for c in self.codes(res) if c.startswith("SEC-")})
+
+
 class TestCli(Base):
     def test_exit_codes_and_json(self):
         import contextlib
