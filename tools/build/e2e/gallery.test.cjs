@@ -74,6 +74,8 @@ async function open(server, urlPath = "", opts = {}) {
 
 const cards = (page) => page.locator("article")
 // Filtering is deferred a frame to keep typing responsive, so wait for the grid instead of reading it instantly.
+const waitTitles = (page, expected) =>
+  page.waitForFunction((t) => JSON.stringify([...document.querySelectorAll("article h3")].map((h) => h.textContent)) === JSON.stringify(t), expected)
 const waitCards = (page, n) => page.waitForFunction((n) => document.querySelectorAll("article").length === n, n)
 const titles = (page) => page.locator("article h3").allTextContents()
 
@@ -122,7 +124,7 @@ describe("discovery", () => {
     const { page, context } = await open(real)
     const search = page.getByRole("searchbox", { name: "Search projects" })
     await search.fill("POMODORO")
-    assert.deepEqual(await titles(page), ["Pomodoro timer"])
+    await waitTitles(page, ["Pomodoro timer"])
     assert.match(await page.getByRole("status").first().innerText(), /1 of 4 projects match/)
     await page.getByRole("button", { name: /^Games/ }).click()
     assert.match(await page.getByText("Nothing matches").innerText(), /Nothing matches/)
@@ -150,19 +152,19 @@ describe("discovery", () => {
     await waitCards(page, 2)
     await page.getByRole("button", { name: /^Tags/ }).click()
     await page.getByRole("button", { name: /^#productivity/ }).click()
-    assert.deepEqual(await titles(page), ["Pomodoro timer"])
+    await waitTitles(page, ["Pomodoro timer"])
     await page.waitForTimeout(400)
     assert.match(page.url(), /kind=app/)
     assert.match(page.url(), /tag=productivity/)
     await page.reload({ waitUntil: "networkidle" })
-    assert.deepEqual(await titles(page), ["Pomodoro timer"])
+    await waitTitles(page, ["Pomodoro timer"])
     await page.getByRole("button", { name: "Clear filters" }).click()
     await page.getByLabel("Sort").selectOption("title-asc")
-    assert.deepEqual(await titles(page), ["Pomodoro timer", "Shelf: a short introduction", "Snake", "URL shortener"])
+    await waitTitles(page, ["Pomodoro timer", "Shelf: a short introduction", "Snake", "URL shortener"])
     await page.getByLabel("Sort").selectOption("oldest")
-    assert.equal((await titles(page))[0], "Pomodoro timer")
+    await waitTitles(page, ["Pomodoro timer", "Snake", "Shelf: a short introduction", "URL shortener"])
     await page.getByLabel("Sort").selectOption("newest")
-    assert.equal((await titles(page))[0], "URL shortener")
+    await waitTitles(page, ["URL shortener", "Shelf: a short introduction", "Snake", "Pomodoro timer"])
     await context.close()
   })
 
@@ -184,7 +186,7 @@ describe("discovery", () => {
     await waitCards(page, 42)
     await page.getByRole("searchbox").fill("second featured")
     await page.getByRole("heading", { name: "Featured", exact: true }).waitFor({ state: "detached" })
-    assert.deepEqual(await titles(page), ["Second featured"])
+    await waitTitles(page, ["Second featured"])
     await context.close()
   })
 
