@@ -1,4 +1,4 @@
-# Shelf artifact spec (v0)
+# Shelf artifact spec (v0.3)
 
 This is the set of rules an artifact must follow to be accepted by Shelf. The validator (`tools/validate/shelf_validate.py`) checks these rules and fails with readable errors. Fields referenced here are defined in [METADATA.md](METADATA.md).
 
@@ -40,6 +40,8 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 </script>
 ```
 
+A fuller example with the optional fields is in [METADATA.md](METADATA.md#example).
+
 ## 4. Storage
 
 - The default is `storage: none`.
@@ -47,6 +49,7 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 - With `storage: local`, those APIs may be used, and the data stays in the visitor's own browser.
 - All artifacts are served from one origin, so they share browser storage. Prefix every key with the slug, for example `pomodoro-timer:settings`, so artifacts do not overwrite each other's data.
 - Nothing is ever sent to a server.
+- The build enforces this in the browser: see section 11.
 
 ## 5. Network
 
@@ -93,6 +96,20 @@ An artifact can be installed on a desktop or phone and keep working offline. It 
 - Everything in the folder is cached when the app is installed, so all assets MUST be local files or approved pinned CDN files. Approved CDN and font responses are cached the first time they load. Requests to any other domain in `network` need a connection, and the validator warns about them.
 - Each installed app is scoped to its own folder and updates when its files change (the cache name carries a content hash). A new version takes effect after the app is closed and opened again.
 
+## 11. Runtime enforcement and trust
+
+Artifacts are arbitrary JavaScript, often written by an AI. Validation reads the source; it cannot prove what code will do. So the build also makes the declared metadata into a browser-enforced rule:
+
+- Every published artifact gets a `Content-Security-Policy` `<meta>` tag (first thing in `<head>` of the served copy). It allows requests only to the artifact's own folder and to the domains in `network`, allows the approved pinned CDNs for scripts, styles and fonts, and turns off `<object>`, `<embed>` and `<base>` changes. An undeclared `fetch`, image, WebSocket or form post is refused by the browser, not just flagged by the validator.
+- The validator rejects `<meta http-equiv="refresh">` redirects and an external `<base href>`, and warns on scripts that navigate to external addresses, touch `window.top`/`window.parent`, or call `eval` / `new Function`.
+- What this does **not** do: artifacts still share one origin, so their scripts can read each other's `localStorage` and can navigate the page elsewhere. Only publish artifacts you wrote or have read. See [`../docs/security.md`](../docs/security.md).
+
+## 12. Links that never break
+
+- The slug is the permanent address: `artifacts/<slug>/`. Renaming with `shelf rename` keeps the old address working through `aliases` (section 3) and pins the old short code in `short`.
+- Slugs and aliases share one namespace; the validator fails on any repeat.
+- `shelf links --compare origin/main` (run by CI) fails when an address or short code that was public on `main` would stop working.
+
 ## Versioning
 
-This is spec v0.2 (adds section 10). The validator now enforces it, so rule changes should change the validator and its tests in the same commit. Changes are recorded in the git history of this file.
+This is spec v0.3: adds the optional metadata fields `featured`, `status`, `why`, `updated`, `source`, `thumbnail` and `aliases`, and sections 11 and 12. Older artifacts need no change. (v0.2 added section 10.) The validator now enforces it, so rule changes should change the validator and its tests in the same commit. Changes are recorded in the git history of this file.

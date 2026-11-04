@@ -344,6 +344,13 @@ class TestSchemaV03(Base):
         self.assertEqual(len(v.crosscheck([r("a", ["x"]), r("b", ["x"])])), 1)
 
 
+class TestDocsInSync(unittest.TestCase):
+    def test_every_metadata_field_is_documented(self):
+        text = (REPO / "spec" / "METADATA.md").read_text(encoding="utf-8")
+        for field in v.KNOWN_FIELDS:
+            self.assertIn(f"| `{field}` |", text, f"spec/METADATA.md has no table row for {field!r}")
+
+
 class TestSecurityRules(Base):
     def test_meta_refresh_to_external_is_error(self):
         res = self.check(page(head='<meta http-equiv="refresh" content="0; url=https://evil.example.org/">'))

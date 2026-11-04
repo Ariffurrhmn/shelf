@@ -412,7 +412,7 @@ def _hints(result: sv.Result) -> str:
         "HTML-VIEWPORT": "Add the viewport meta tag, or re-run with --fix.",
         "STORAGE": "The page uses browser storage: re-run with --storage local.",
         "NETWORK": "The page makes network requests: re-run with --network api.example.com (the domains it contacts).",
-        "DEPENDENCY": "Use a pinned CDN URL (x.y.z) or copy the library into the artifact folder.",
+        "DEP-": "Use a pinned CDN URL (x.y.z) or copy the library into the artifact folder.",
     }
     seen = []
     for i in result.errors:

@@ -17,10 +17,45 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 | `short` | string | no | automatic | Your own short-link code, for example `kafka` gives `<site>/kafka`. 2 to 32 characters: lowercase letters, digits and single hyphens, starting and ending with a letter or digit. `artifacts`, `assets`, `thumbnails`, `index` and `404` are reserved. Without it Shelf assigns a stable 4-character code. See [Short links](#short-links). |
 | `install` | boolean | no | `false` | If `true`, the build makes the artifact installable as a PWA that works offline, see SPEC section 10. |
 | `color` | string | no | from slug | Hex colour such as `#d64933`: theme colour and icon background of the installed app. Only used with `install`. |
+| `featured` | boolean | no | `false` | Shows the project in the gallery's Featured strip. Nothing is featured unless you set this. |
+| `status` | string | no | | `experiment` or `finished`. Shown on cards when set. |
+| `why` | string | no | | Why it was made, 400 characters at most. Shown in the details view. |
+| `updated` | string | no | | Date of the last meaningful change as `YYYY-MM-DD`; not before `created`. |
+| `source` | string | no | | `http(s)` link to the conversation or repository it came from. |
+| `thumbnail` | string | no | screenshot | A plain file name in the artifact folder (`.png`, `.jpg`, `.jpeg`, `.webp`, 2 MB at most) used instead of the automatic screenshot. It is resized to the same 8:5 format. |
+| `aliases` | list of strings | no | `[]` | Earlier slugs. `artifacts/<old>/` keeps redirecting to this artifact. `shelf rename` maintains it. |
+
+## Example
+
+```json
+{
+  "title": "Focus Timer",
+  "description": "A 25-minute focus timer with a soft chime.",
+  "created": "2026-10-20",
+  "updated": "2026-11-02",
+  "tool": "Claude",
+  "kind": "app",
+  "status": "finished",
+  "tags": ["productivity", "timer"],
+  "why": "I kept losing track of my breaks.",
+  "notes": "Sample note. I would add a session counter.",
+  "storage": "local",
+  "network": [],
+  "install": true,
+  "featured": true,
+  "source": "https://claude.ai/chat/example",
+  "thumbnail": "cover.png",
+  "aliases": ["pomodoro"]
+}
+```
+
+Only the five required fields matter for an artifact to be accepted; every other field can be left out.
 
 ## Notes
 
-- Unknown fields are ignored with a warning, so a typo such as `tgas` is visible but does not break the build.
+- Unknown fields are ignored with a warning, so a typo such as `tgas` is visible but does not break the build. They are not copied to the gallery.
+- Dates are strict `YYYY-MM-DD` (zero-padded) so they sort correctly as text; `2026-1-2` is rejected.
+- `kind` is the category shown in the gallery; there is no separate category field.
 - `description` is a single line, no line breaks.
 - `network` entries are bare domains (for example the host part of a URL), not full URLs. Entries with a scheme, path or port are rejected.
 - `kind: presentation` triggers the extra rules in SPEC section 8.

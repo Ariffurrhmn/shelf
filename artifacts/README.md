@@ -13,12 +13,20 @@ artifacts/<slug>/index.html
 - Lowercase letters, digits, and hyphens only (`a-z`, `0-9`, `-`).
 - Starts with a letter or digit; no leading, trailing, or doubled hyphens.
 - Descriptive and short, for example `pomodoro-timer` or `kafka-intro-slides`.
-- Unique within this directory. The slug becomes part of the public URL, so rename with care. It also seeds the artifact's automatic short link, so renaming changes that too; set `short` in the metadata to keep a link you have already shared.
+- Unique within this directory. The slug becomes part of the public URL, so do not rename by hand: `python shelf rename <old> <new>` moves the folder and keeps the old address (`aliases`) and the old short link (`short`) working.
+
+## Adding one
+
+```bash
+python shelf add my-app.html
+```
+
+See [`../docs/ai-workflow.md`](../docs/ai-workflow.md).
 
 ## What goes in a folder
 
 - `index.html` with the metadata block described in [`../spec/METADATA.md`](../spec/METADATA.md).
-- Optional local assets used by that page.
+- Optional local assets used by that page, and an optional cover image named in the `thumbnail` field.
 
 Nothing outside the artifact folder may be referenced. The full rules are in [`../spec/SPEC.md`](../spec/SPEC.md).
 
