@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holocron: Star Wars Watch Order</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Holocron: Star Wars Watch Order",
+  "description": "A chronological Star Wars watch list across films, series and anthologies, with episode checklists, a sealed archive of what's done, and progress saved on this device.",
+  "created": "2026-11-04",
+  "tool": "Claude",
+  "kind": "app",
+  "tags": [
+    "star-wars",
+    "tracker",
+    "watchlist"
+  ],
+  "why": "Star Wars is not watched in release order, and even the Clone Wars is a collection of anthologies. This keeps track of what to watch after what.",
+  "notes": "Remade from Holocron 8.0 for Shelf. Progress is stored in this browser using the same save format as the original, so a save file can be copied between the two. The poster-gallery feature that needed a personal TMDB API key was left out.",
+  "storage": "local",
+  "network": [
+    "fonts.googleapis.com",
+    "fonts.gstatic.com"
+  ],
+  "install": true,
+  "color": "#fbbf24"
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;900&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; --bg:#04060c; --panel:#0b101d; --panel2:#0f1626; --line:rgba(251,191,36,.18); --line2:rgba(148,163,184,.18);
+          --ink:#e2e8f0; --muted:#94a3b8; --gold:#fbbf24; --ok:#34d399; --danger:#f87171;
+          --batch:#a3e635; --rebellion:#fb923c; --republic:#38bdf8; --firstorder:#f87171;
+          --display:'Orbitron', ui-sans-serif, system-ui, sans-serif; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #stars { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+  .app { position:relative; z-index:1; max-width:1040px; margin:0 auto; padding:0 16px 56px; }
+  button, input, textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  :focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:6px; }
+  .disp { font-family:var(--display); text-transform:uppercase; letter-spacing:.14em; }
+  .muted { color:var(--muted); }
+  header.top { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; padding:28px 0 18px; }
+  h1 { margin:0; font-family:var(--display); font-weight:900; font-size:clamp(1.7rem,6vw,2.6rem); letter-spacing:.06em; color:var(--gold); line-height:1; }
+  .sub { margin:6px 0 0; font-size:.7rem; letter-spacing:.28em; color:var(--muted); }
+  .meter { min-width:220px; }
+  .meter .big { display:flex; align-items:baseline; justify-content:flex-end; gap:10px; }
+  .meter .pct { font-family:var(--display); font-weight:900; font-size:1.7rem; color:var(--gold); }
+  .meter .count { font-size:.72rem; color:var(--muted); letter-spacing:.08em; }
+  .bar { height:6px; border-radius:99px; background:#1e293b; overflow:hidden; margin-top:6px; }
+  .bar > i { display:block; height:100%; background:var(--gold); border-radius:99px; transition:width .35s ease; }
+  .panel { background:var(--panel); border:1px solid var(--line2); border-radius:16px; }
+  .next { display:grid; gap:12px; padding:18px; margin:6px 0 20px; border-color:var(--line); background:linear-gradient(135deg,#111a30,#0b101d); }
+  .next .lab { font-size:.68rem; color:var(--gold); }
+  .next h2 { margin:0; font-size:1.25rem; line-height:1.25; }
+  .next .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; margin-bottom:14px; }
+  .tab, .chip, .btn { border:1px solid var(--line2); background:transparent; border-radius:10px; padding:8px 14px; min-height:40px; color:var(--ink); white-space:nowrap; }
+  .tab { font-family:var(--display); font-size:.68rem; letter-spacing:.12em; padding:8px 12px; text-transform:uppercase; }
+  .tab[aria-selected="true"] { color:var(--gold); border-color:var(--gold); background:rgba(251,191,36,.1); }
+  .chip { font-size:.78rem; padding:6px 12px; min-height:36px; }
+  .chip[aria-pressed="true"] { border-color:var(--gold); background:rgba(251,191,36,.12); color:var(--gold); }
+  .chip .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:var(--c, var(--muted)); }
+  .btn { font-size:.85rem; }
+  .btn:hover, .tab:hover, .chip:hover { background:rgba(148,163,184,.1); }
+  .btn.primary { background:var(--gold); color:#1a1405; border-color:var(--gold); font-weight:700; }
+  .btn.primary:hover { background:#fcd34d; }
+  .btn.ok { border-color:rgba(52,211,153,.5); color:var(--ok); }
+  .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+  .toolbar .grow { flex:1; }
+  .list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+  .item { overflow:hidden; }
+  .item.done { opacity:.55; }
+  .head { display:flex; align-items:center; gap:12px; padding:12px 14px; }
+  .num { font-family:var(--display); font-size:.7rem; color:var(--muted); width:2ch; text-align:right; flex:none; }
+  input[type=checkbox] { appearance:none; width:26px; height:26px; flex:none; border:2px solid #475569; border-radius:8px; background:#070b14; display:grid; place-items:center; cursor:pointer; margin:0; }
+  input[type=checkbox]:checked { background:var(--gold); border-color:var(--gold); }
+  input[type=checkbox]:checked::after { content:""; width:6px; height:12px; border:solid #1a1405; border-width:0 3px 3px 0; transform:rotate(45deg) translate(-1px,-1px); }
+  input[type=checkbox].sel:checked { background:#38bdf8; border-color:#38bdf8; }
+  .info { flex:1; min-width:0; }
+  .title { margin:0; font-weight:600; font-size:.98rem; line-height:1.3; overflow-wrap:anywhere; }
+  .meta { margin:2px 0 0; font-size:.72rem; color:var(--muted); letter-spacing:.04em; }
+  .badge { display:inline-flex; align-items:center; gap:6px; font-size:.62rem; border:1px solid color-mix(in srgb, var(--c) 45%, transparent); color:var(--c); border-radius:99px; padding:1px 9px; font-family:var(--display); letter-spacing:.1em; text-transform:uppercase; }
+  .badge::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--c); }
+  .iconbtn { width:36px; height:36px; flex:none; border:1px solid var(--line2); background:transparent; border-radius:9px; color:var(--muted); display:grid; place-items:center; }
+  .iconbtn:hover { color:var(--gold); border-color:var(--gold); }
+  .seasons { border-top:1px solid var(--line2); background:rgba(0,0,0,.25); padding:10px 12px 14px; display:grid; gap:14px; }
+  .seasons h4 { margin:0 0 6px; font-family:var(--display); font-size:.65rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); font-weight:500; }
+  .eps { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
+  .ep { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; }
+  .ep:hover { background:rgba(148,163,184,.07); }
+  .ep input[type=checkbox] { width:22px; height:22px; border-radius:6px; }
+  .ep label { flex:1; min-width:0; font-size:.88rem; cursor:pointer; }
+  .ep.done label { text-decoration:line-through; color:var(--muted); }
+  .showbar { height:3px; background:#1e293b; } .showbar i { display:block; height:100%; background:var(--gold); }
+  .chev { transition:transform .2s; } [aria-expanded="true"] .chev { transform:rotate(180deg); }
+  .intro { padding:16px; margin-bottom:12px; }
+  .intro h2 { margin:0 0 4px; font-family:var(--display); font-size:1rem; color:var(--gold); letter-spacing:.1em; text-transform:uppercase; }
+  details.group { overflow:hidden; } details.group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 14px; }
+  details.group > summary::-webkit-details-marker { display:none; }
+  details.group[open] > summary .chev { transform:rotate(180deg); }
+  .ok-mark { width:26px; height:26px; flex:none; border-radius:8px; border:1px solid rgba(52,211,153,.5); background:rgba(52,211,153,.12); color:var(--ok); display:grid; place-items:center; font-weight:900; font-size:.8rem; }
+  .cwlist { max-height:520px; overflow:auto; padding:8px 10px 12px; background:rgba(0,0,0,.25); border-top:1px solid var(--line2); display:grid; gap:4px; margin:0; list-style:none; }
+  .cw { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; font-size:.86rem; }
+  .cw.event { border:1px solid rgba(248,113,113,.4); background:rgba(248,113,113,.07); color:#fca5a5; font-weight:700; text-transform:uppercase; }
+  .cw .arc { margin-left:auto; font-size:.62rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+  .tier { font-size:.6rem; border-radius:6px; padding:0 6px; border:1px solid var(--line2); color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  .tier.must { color:var(--gold); border-color:rgba(251,191,36,.5); }
+  .tier.skip { opacity:.7; }
+  .cards { display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  a.card { display:block; padding:14px; text-decoration:none; color:inherit; border:1px solid var(--line2); border-radius:12px; background:var(--panel); }
+  a.card:hover { border-color:var(--gold); } a.card b { color:var(--ink); } a.card p { margin:4px 0 0; font-size:.82rem; color:var(--muted); }
+  .sect { margin:22px 0 10px; font-family:var(--display); font-size:.72rem; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); font-weight:500; }
+  .fact { padding:12px 14px; font-size:.88rem; color:#cbd5e1; } .fact.i { font-style:italic; color:var(--muted); }
+  dialog { border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:16px; padding:0; width:min(520px,calc(100vw - 24px)); max-height:88vh; box-shadow:0 30px 90px rgba(0,0,0,.7); }
+  dialog::backdrop { background:rgba(0,0,0,.65); }
+  .dhead { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line2); position:sticky; top:0; background:var(--panel2); }
+  .dbody { padding:16px 18px 22px; overflow:auto; max-height:calc(88vh - 60px); }
+  .dbody h2 { margin:6px 0 2px; font-family:var(--display); color:var(--gold); font-size:1.15rem; line-height:1.3; }
+  .dbody h3 { margin:16px 0 4px; font-family:var(--display); font-size:.62rem; letter-spacing:.2em; color:var(--muted); text-transform:uppercase; font-weight:500; }
+  .dbody p { margin:0; font-size:.92rem; color:#cbd5e1; }
+  .selbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 12px; margin-bottom:12px; border-color:rgba(56,189,248,.35); }
+  details.backup { margin-top:26px; padding:0; } details.backup > summary { padding:12px 16px; cursor:pointer; font-size:.85rem; color:var(--muted); }
+  details.backup .in { padding:0 16px 16px; display:grid; gap:10px; }
+  textarea { width:100%; min-height:96px; background:#070b14; border:1px solid var(--line2); border-radius:10px; padding:10px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; resize:vertical; }
+  code { font:.85em ui-monospace,Menlo,Consolas,monospace; background:#111827; padding:1px 6px; border-radius:5px; }
+  .msg { font-size:.82rem; min-height:1.2em; color:var(--ok); } .msg.err { color:var(--danger); }
+  footer { margin-top:36px; text-align:center; font-size:.62rem; letter-spacing:.5em; color:#475569; }
+  .empty { padding:28px; text-align:center; color:var(--muted); }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  @media (max-width:560px) { .meter { width:100%; } .head { padding:10px; gap:10px; } }
+  @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .bar > i, .chev { transition:none; } }
+</style>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Holocron</h1>
+      <p class="sub disp">Star Wars · chronological watch order</p>
+    </div>
+    <div class="meter" aria-live="polite">
+      <div class="big"><span class="pct" id="pct">0%</span><span class="count" id="count"></span></div>
+      <div class="bar" role="progressbar" aria-label="Watch next progress" aria-valuemin="0" aria-valuemax="100" id="pbar"><i id="pfill" style="width:0%"></i></div>
+      <p class="count" id="archline" style="margin:6px 0 0;text-align:right"></p>
+    </div>
+  </header>
+
+  <section id="next" class="panel next" aria-label="Up next"></section>
+
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="tab-active" aria-controls="view-active" aria-selected="true">Watch next</button>
+    <button class="tab" role="tab" id="tab-archive" aria-controls="view-archive" aria-selected="false" tabindex="-1">Archive</button>
+    <button class="tab" role="tab" id="tab-extras" aria-controls="view-extras" aria-selected="false" tabindex="-1">Extras</button>
+  </div>
+
+  <main>
+    <section id="view-active" role="tabpanel" aria-labelledby="tab-active">
+      <div class="toolbar" id="filters" role="group" aria-label="Filter by era"></div>
+      <div class="toolbar">
+        <label class="chip" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="hidedone" style="width:18px;height:18px;border-radius:5px"> Hide finished</label>
+        <span class="grow"></span>
+        <button class="btn" id="selmode" aria-pressed="false">Select several</button>
+        <button class="btn" id="sound" aria-pressed="true">Sound on</button>
+      </div>
+      <div id="selbar" class="panel selbar" hidden>
+        <span id="selcount" class="disp" style="font-size:.7rem;color:#7dd3fc">0 selected</span>
+        <button class="btn" id="selall">Select all shown</button>
+        <button class="btn" id="selnone">Clear</button>
+        <button class="btn ok" id="selwatch">Mark watched</button>
+        <button class="btn" id="selunwatch">Mark unwatched</button>
+      </div>
+      <ol class="list" id="list"></ol>
+
+      <details class="panel backup" id="backup">
+        <summary>Back up, import or reset my progress</summary>
+        <div class="in">
+          <p class="muted" style="margin:0;font-size:.85rem">Your progress is saved in this browser only. This is the whole save file; copy it somewhere safe, or paste one from another device or from the original Holocron.</p>
+          <label class="sr" for="exp">Progress save file</label>
+          <textarea id="exp" readonly></textarea>
+          <div class="toolbar"><button class="btn" id="copy">Copy save file</button></div>
+          <label for="imp" class="muted" style="font-size:.85rem">Import: paste a save file here. From the original Holocron, open its page, press F12, and in the console run <code>copy(localStorage.getItem('sw_holocron_v8'))</code>, then paste.</label>
+          <textarea id="imp" placeholder='[{"id":"andor","expanded":false,"seasons":[...]}]'></textarea>
+          <div class="toolbar"><button class="btn primary" id="import">Import</button><button class="btn" id="reset" style="margin-left:auto;color:var(--danger)">Reset all progress</button></div>
+          <p class="msg" id="bmsg" role="status"></p>
+        </div>
+      </details>
+    </section>
+
+    <section id="view-archive" role="tabpanel" aria-labelledby="tab-archive" hidden></section>
+    <section id="view-extras" role="tabpanel" aria-labelledby="tab-extras" hidden></section>
+  </main>
+  <footer class="disp">May the Force be with you</footer>
+</div>
+
+<dialog id="datafile" aria-labelledby="dtitle">
+  <div class="dhead"><span class="disp" style="font-size:.65rem;color:var(--gold)">Datafile</span><button class="iconbtn" id="dclose" aria-label="Close datafile">✕</button></div>
+  <div class="dbody" id="dbody"></div>
+</dialog>
+
+<script>
+(function () {
+'use strict';
+var DATA = {"active":[{"id":"bad-batch","type":"show","era":"batch","title":"Star Wars: The Bad Batch","meta":"2021–2024 · 3 Seasons · 47 Episodes","synopsis":"Clone Force 99 — a squad of genetically enhanced clones known as the Bad Batch — navigate the fallout of Order 66 and the rise of the Empire, trying to find their place in a galaxy that no longer needs clone soldiers.","characters":"Hunter, Wrecker, Tech, Echo, Crosshair, Omega, Cid, Rex","connections":"Picks up literally moments after The Clone Wars finale. Sets up Crosshair's inhibitor chip fate, introduces Omega (later crucial to clone trooper lore), and bridges directly into the founding of the Empire.","trivia":"Omega is later confirmed to be an unaltered clone of Jango Fett, genetically identical to Boba Fett rather than an enhanced Bad Batch member.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Aftermath","trivia":"Order 66 unfolds through the eyes of the Bad Batch on Kaladush."},{"e":2,"title":"Cut and Run","trivia":"The squad reconnects with Cut Lawquane, the clone deserter from The Clone Wars."},{"e":3,"title":"Replacements","trivia":"Crosshair is recalled to Kamino for inhibitor chip \"maintenance\"."},{"e":4,"title":"Cornered","trivia":"The team returns to Pantora, tying back to Clone Wars politics arcs."},{"e":5,"title":"Rampage","trivia":"A rogue Reeksa beast forces a detour on Saleucami."},{"e":6,"title":"Decommissioned","trivia":"The squad discovers regular clones are being phased out for stormtroopers."},{"e":7,"title":"The Battle of Ranzar","trivia":"A hyperspace ring heist for Cid."},{"e":8,"title":"Reunion","trivia":"Crosshair confronts his former squadmates as an Imperial loyalist."},{"e":9,"title":"Bounty Lost","trivia":"Omega is captured by bounty hunter Fennec Shand."},{"e":10,"title":"Common Ground","trivia":"The team gets entangled in a Separatist holdout conflict on Raxus."},{"e":11,"title":"Devil's Deal","trivia":"Cid brokers a dangerous job that nearly costs the squad everything."},{"e":12,"title":"Rescue on Ryloth","trivia":"Reunites with Clone Wars figures on Ryloth amid Imperial occupation."},{"e":13,"title":"Infested","trivia":"A supply run to Ord Mantell goes sideways with giant insectoids."},{"e":14,"title":"War-Mantle","trivia":"Echo goes undercover, revealing the horrifying Project Necromancer."},{"e":15,"title":"The Summit","trivia":"Introduces the political machinery consolidating Imperial power."},{"e":16,"title":"Kamino Lost","trivia":"The Empire abandons and destroys Kamino, ending the cloning era."}]},{"s":2,"label":"Season 2","episodes":[{"e":1,"title":"Spoils of War","trivia":"The team salvages Kamino's wreckage as the clone era formally ends."},{"e":2,"title":"Ruins of War","trivia":"A search for Omega deepens the Nala Se mystery."},{"e":3,"title":"The Solitary Clone","trivia":"Follows Crosshair alone, now disillusioned within the Empire."},{"e":4,"title":"Faster","trivia":"A podrace cover story on Safa Orbis."},{"e":5,"title":"Entombed","trivia":"A collapsed cave hunt for kyber crystal caches."},{"e":6,"title":"Return to Kamino","trivia":"The team returns to the ruined cloning homeworld."},{"e":7,"title":"Metamorphosis","trivia":"Emperor Palpatine's cloning experiments accelerate."},{"e":8,"title":"Truth and Consequences","trivia":"Crosshair is targeted by his own Imperial superiors."},{"e":9,"title":"The Crossing","trivia":"The Batch tries to extract Crosshair from Imperial custody."},{"e":10,"title":"Identity Crisis","trivia":"Echo and Rex investigate the Emperor's cloning program."},{"e":11,"title":"Point of No Return","trivia":"Crosshair finally breaks from the Empire."},{"e":12,"title":"The Outpost","trivia":"The squad regroups and hides from Imperial pursuit."},{"e":13,"title":"Pabu","trivia":"The Batch discovers the idyllic island of Pabu, a rare safe haven."},{"e":14,"title":"Tribe","trivia":"The Batch begins to consider Pabu a home."},{"e":15,"title":"Battle Scars","trivia":"Rex and Gregor recruit surviving clones for a rescue network."},{"e":16,"title":"Plan 99","trivia":"Season finale — Tantiss fortress is revealed as Palpatine's cloning lab."}]},{"s":3,"label":"Season 3 (Final Season)","episodes":[{"e":1,"title":"Confined","trivia":"Omega is imprisoned inside Mount Tantiss."},{"e":2,"title":"Shadows of Tantiss","trivia":"Hemlock's experiments on captured clones are revealed."},{"e":3,"title":"The Harbinger","trivia":"Crosshair is forcibly reactivated by Imperial control."},{"e":4,"title":"Necessary Risks","trivia":"The Batch stages a first attempt to breach Tantiss."},{"e":5,"title":"The Return","trivia":"Omega reunites briefly with her squad."},{"e":6,"title":"Infiltration","trivia":"A tense undercover operation inside the fortress."},{"e":7,"title":"The Summit (Pt. 2 arc)","trivia":"Ties the clone program to the wider Imperial hierarchy."},{"e":8,"title":"Point of No Return (S3)","trivia":"Major losses mount as the rescue mission unravels."},{"e":9,"title":"Juggernaut","trivia":"A desperate stand against overwhelming Imperial forces."},{"e":10,"title":"Identity","trivia":"The truth about Omega's origin as a pure Fett clone surfaces."},{"e":11,"title":"Point of No Return (Finale Arc)","trivia":"The Batch commits fully to the final assault on Tantiss."},{"e":12,"title":"Ghost Fleet / Ministry of Truth","trivia":"Imperial propaganda machinery and clone erasure accelerate."},{"e":13,"title":"The Cavalry Has Arrived","trivia":"Old allies join the climactic rescue."},{"e":14,"title":"Flash Strike","trivia":"The team launches an all-out strike on Tantiss."},{"e":15,"title":"The Precipice","trivia":"The series races toward its final confrontation."},{"e":16,"title":"The Summit / Emperor of Dreams","trivia":"Series finale — the Bad Batch's story closes as the Empire tightens its grip on the galaxy."}]}]},{"id":"maul-shadow-lord","type":"movie","era":"batch","title":"Star Wars: Maul – Shadow Lord","meta":"Upcoming (2026)","synopsis":"An anticipated animated feature continuing Darth Maul's story during the early Imperial era, expanding on his fate after the fall of the Republic.","characters":"Maul, and expected crossover figures from the Shadow Collective era","connections":"Slots into the Reign of the Empire period, continuing threads left open by Maul's Clone Wars and Rebels appearances.","trivia":"Announced as part of Lucasfilm's continued expansion of Maul's saga, one of the few Star Wars villains to survive across multiple eras of the timeline."},{"id":"solo","type":"movie","era":"batch","title":"Solo: A Star Wars Story","meta":"Film (2018)","synopsis":"A young Han Solo finds adventure when he joins a group of galactic smugglers, including a mysterious gambler named Lando Calrissian, years before joining the Rebellion.","characters":"Han Solo, Chewbacca, Lando Calrissian, Qi'ra, L3-37, Tobias Beckett","connections":"Shows the Kessel Run, the origin of Han and Chewie's partnership, and Han winning the Millennium Falcon from Lando.","trivia":"Features a surprise post-credits cameo tying Maul directly to Qi'ra and the Crimson Dawn crime syndicate."},{"id":"kenobi","type":"show","era":"rebellion","title":"Obi-Wan Kenobi","meta":"2022 · 1 Season · 6 Episodes","synopsis":"Ten years after the fall of the Jedi Order, Obi-Wan Kenobi faces his greatest challenge yet — confronting his former apprentice, Darth Vader, while protecting a young Leia Organa.","characters":"Obi-Wan Kenobi, Darth Vader, Leia Organa, Reva (Third Sister), Owen Lars","connections":"Directly bridges Revenge of the Sith and A New Hope, deepening the Obi-Wan/Vader rivalry and explaining Leia's early connection to Obi-Wan.","trivia":"Marks Hayden Christensen's return to live-action as Anakin/Vader for the first time since Revenge of the Sith.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Part I","trivia":"Establishes Obi-Wan's exile on Tatooine, watching over young Luke."},{"e":2,"title":"Part II","trivia":"Obi-Wan is drawn out of hiding to rescue a kidnapped Leia."},{"e":3,"title":"Part III","trivia":"The Inquisitors close in as Obi-Wan and Leia go on the run."},{"e":4,"title":"Part IV","trivia":"Vader senses his old master and begins the hunt personally."},{"e":5,"title":"Part V","trivia":"A brutal confrontation forces Obi-Wan to relive his failure with Anakin."},{"e":6,"title":"Part VI","trivia":"Series finale — the definitive \"Hello there\" duel with Vader."}]}]},{"id":"andor","type":"show","era":"rebellion","title":"Andor","meta":"2022–2025 · 2 Seasons · 24 Episodes","synopsis":"The story of Cassian Andor's transformation from a cynical smuggler into a full-fledged rebel spy, and the grinding, morally complex birth of the Rebel Alliance itself.","characters":"Cassian Andor, Luthen Rael, Mon Mothma, Syril Karn, Bix Caleen, Kleya Marki","connections":"A direct prequel to Rogue One, culminating in the events immediately preceding that film. Widely regarded as the most mature, grounded entry in the franchise.","trivia":"Season 2's 12 episodes were structured as four 3-episode blocks, each jumping forward exactly one year, ending right where Rogue One begins.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Kassa","trivia":"Cassian kills two corporate security officers on Morlana One."},{"e":2,"title":"That Would Be Me","trivia":"Imperial security begins investigating Cassian."},{"e":3,"title":"Reckoning","trivia":"Cassian is recruited by the mysterious Luthen Rael."},{"e":4,"title":"Aldhani","trivia":"Introduces the Aldhani heist crew."},{"e":5,"title":"The Axe Forgets","trivia":"Tensions rise within the rebel cell before the heist."},{"e":6,"title":"The Eye","trivia":"The Aldhani Imperial garrison heist unfolds."},{"e":7,"title":"Announcement","trivia":"Fallout from the heist ripples across the Empire."},{"e":8,"title":"Narkina 5","trivia":"Cassian is sentenced to a brutal Imperial labor prison."},{"e":9,"title":"Nobody's Listening!","trivia":"The horror of the Narkina 5 prison factory floor."},{"e":10,"title":"One Way Out","trivia":"A tense, celebrated prison break sequence."},{"e":11,"title":"Daughter of Ferrix","trivia":"Maarva's funeral becomes a spark of rebellion."},{"e":12,"title":"Rix Road","trivia":"Season finale — Ferrix rises up against the Empire."}]},{"s":2,"label":"Season 2","episodes":[{"e":1,"title":"One Year Later (Pt.1)","trivia":"Time jump — Cassian test-pilots a stolen TIE prototype."},{"e":2,"title":"One Year Later (Pt.2)","trivia":"The rebellion's logistics network expands."},{"e":3,"title":"One Year Later (Pt.3)","trivia":"Mon Mothma's political cover grows more dangerous."},{"e":4,"title":"Ever Been to Ghorman? (Pt.1)","trivia":"Introduces the Ghorman occupation storyline."},{"e":5,"title":"Ever Been to Ghorman? (Pt.2)","trivia":"The Empire escalates its economic warfare on Ghorman."},{"e":6,"title":"Ever Been to Ghorman? (Pt.3)","trivia":"Rebel cells mobilize around the Ghorman crisis."},{"e":7,"title":"Messenger (Pt.1)","trivia":"The Ghorman Massacre arc begins."},{"e":8,"title":"Messenger (Pt.2)","trivia":"Mon Mothma's public break with the Empire."},{"e":9,"title":"Messenger (Pt.3)","trivia":"The massacre on Ghorman unfolds in devastating detail."},{"e":10,"title":"Jedha, Kyber, Erso (Pt.1)","trivia":"Direct connective tissue into Rogue One's setup."},{"e":11,"title":"Jedha, Kyber, Erso (Pt.2)","trivia":"Galen Erso and the Death Star project take center stage."},{"e":12,"title":"Jedha, Kyber, Erso (Pt.3)","trivia":"Series finale — ends moments before Rogue One begins."}]}]},{"id":"rebels","type":"show","era":"rebellion","title":"Star Wars Rebels","meta":"2014–2018 · 4 Seasons · 75 Episodes","synopsis":"Five years before the events of A New Hope, a crew aboard the starship Ghost — led by Jedi Kanan Jarrus and his Padawan Ezra Bridger — sparks the fires of rebellion against the Empire on Lothal.","characters":"Ezra Bridger, Kanan Jarrus, Hera Syndulla, Sabine Wren, Zeb Orrelios, Chopper, Ahsoka Tano, Grand Admiral Thrawn","connections":"Bridges The Clone Wars and Andor/Rogue One-era rebellion, brings back Ahsoka Tano, introduces Grand Admiral Thrawn, and directly sets up the Ahsoka (2023) series.","trivia":"Ahsoka Tano's live-action counterpart and Grand Admiral Thrawn both made their live-action debuts by being adapted directly from this series.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Spark of Rebellion","trivia":"Introduces the Ghost crew and Ezra Bridger."},{"e":2,"title":"Droids in Distress","trivia":"The crew crosses paths with a young Lando Calrissian."},{"e":3,"title":"Fighter Flight","trivia":"Ezra and Zeb bond (reluctantly) over a stolen TIE fighter."},{"e":4,"title":"Rise of the Old Masters","trivia":"A rescue mission for a captured Jedi Master."},{"e":5,"title":"Breaking Ranks","trivia":"Ezra infiltrates the Imperial Academy on Lothal."},{"e":6,"title":"Out of Darkness","trivia":"Hera's past and piloting prowess take center stage."},{"e":7,"title":"Empire Day","trivia":"Reveals the fate of Ezra's parents."},{"e":8,"title":"Gathering Forces","trivia":"The Inquisitor closes in on the Ghost crew."},{"e":9,"title":"Path of the Jedi","trivia":"Ezra undergoes a trial in a Jedi Temple."},{"e":10,"title":"Idiot's Array","trivia":"Lando returns amid a card-game heist gone wrong."},{"e":11,"title":"Vision of Hope","trivia":"Bail Organa makes contact with the growing rebel network."},{"e":12,"title":"Call to Action","trivia":"The Ghost crew becomes a true rebel cell."},{"e":13,"title":"Rebel Resolve","trivia":"Kanan is captured by the Empire."},{"e":14,"title":"Fire Across the Galaxy","trivia":"Season finale — first appearance of a fully assembled rebel fleet."}]},{"s":2,"label":"Season 2","episodes":[{"e":1,"title":"The Siege of Lothal (Pt.1)","trivia":"Vader personally arrives to crush the rebellion on Lothal."},{"e":2,"title":"The Siege of Lothal (Pt.2)","trivia":"Ahsoka Tano makes her live-continuity return."},{"e":3,"title":"The Lost Commanders","trivia":"Introduces Rex, Wolffe, and Gregor in hiding."},{"e":4,"title":"Relics of the Old Republic","trivia":"Old clone troopers face their trauma from Order 66."},{"e":5,"title":"Always Two There Are","trivia":"Introduces the Inquisitor duo the Fifth Brother and Seventh Sister."},{"e":6,"title":"Legacy","trivia":"Ezra learns about his family's fate in full."},{"e":7,"title":"A Princess on Lothal","trivia":"Princess Leia's first appearance in the series."},{"e":8,"title":"The Protector of Concord Dawn","trivia":"Sabine's Mandalorian ties are explored."},{"e":9,"title":"Stealth Strike","trivia":"A mission to sabotage a Star Destroyer's construction."},{"e":10,"title":"The Future of the Force","trivia":"The Inquisitors hunt Force-sensitive children."},{"e":11,"title":"Legends of the Lasat","trivia":"Zeb's people, the Lasat, find a possible new homeworld."},{"e":12,"title":"The Call","trivia":"A lighter mission securing fuel for the fleet."},{"e":13,"title":"Homecoming","trivia":"Hera reunites with her father, Cham Syndulla."},{"e":14,"title":"The Honorable Ones","trivia":"Zeb and an Imperial officer are stranded together."},{"e":15,"title":"Shroud of Darkness","trivia":"Ahsoka and Kanan seek guidance from Jedi spirits."},{"e":16,"title":"The Forgotten Droid","trivia":"Chopper takes center stage on an Imperial cruiser."},{"e":17,"title":"The Mystery of Chopper Base","trivia":"The rebels find a new secret base."},{"e":18,"title":"Twilight of the Apprentice (Pt.1)","trivia":"Introduces Grand Inquisitor's master, Darth Vader."},{"e":19,"title":"Twilight of the Apprentice (Pt.2)","trivia":"Season finale — Ahsoka's duel with Vader; Ezra meets Maul."}]},{"s":3,"label":"Season 3","episodes":[{"e":1,"title":"Steps Into Shadow","trivia":"Ezra has been training with Maul off-screen between seasons."},{"e":2,"title":"The Holocrons of Fate","trivia":"Maul manipulates Ezra and Kanan for holocron secrets."},{"e":3,"title":"The Antilles Extraction","trivia":"Introduces a young Wedge Antilles."},{"e":4,"title":"Hera's Heroes","trivia":"A heist targets Imperial funds bound for Grand Moff Tarkin."},{"e":5,"title":"The Last Battle","trivia":"Rex confronts old Separatist droids in a simulated war."},{"e":6,"title":"Imperial Supercommandos","trivia":"Sabine's family and Mandalorian politics deepen."},{"e":7,"title":"Iron Squadron","trivia":"A reckless young rebel crew causes trouble."},{"e":8,"title":"The Wynkahthu Job","trivia":"A salvage mission with bounty hunter Hondo Ohnaka."},{"e":9,"title":"An Inside Man","trivia":"Introduces the Imperial factory world Lothal has become."},{"e":10,"title":"Visions and Voices","trivia":"Ezra and Maul share a Force-vision link."},{"e":11,"title":"Ghosts of Geonosis (Pt.1)","trivia":"The rebels investigate the ruins of Geonosis."},{"e":12,"title":"Ghosts of Geonosis (Pt.2)","trivia":"Reveals the fate of the Geonosian species under the Empire."},{"e":13,"title":"Warhead","trivia":"Chopper and AP-5 defuse an Imperial superweapon."},{"e":14,"title":"Trials of the Darksaber","trivia":"Sabine begins training with the legendary Darksaber."},{"e":15,"title":"Legacy of Mandalore","trivia":"Sabine returns home to confront her mother."},{"e":16,"title":"Through Imperial Eyes","trivia":"A mole within the rebel fleet is exposed."},{"e":17,"title":"Secret Cargo","trivia":"The rebels protect a defecting Imperial senator."},{"e":18,"title":"Double Agent Droid","trivia":"AP-5 uncovers a spy droid in the fleet."},{"e":19,"title":"Twin Suns","trivia":"Ezra travels to Tatooine and meets a hermit named Ben."},{"e":20,"title":"Zero Hour (Pt.1)","trivia":"Thrawn launches an all-out assault on Chopper Base."},{"e":21,"title":"Zero Hour (Pt.2)","trivia":"Season finale — Ahsoka faces Thrawn as the base falls."}]},{"s":4,"label":"Season 4 (Final Season)","episodes":[{"e":1,"title":"Heroes of Mandalore (Pt.1)","trivia":"Sabine leads the liberation of Mandalore."},{"e":2,"title":"Heroes of Mandalore (Pt.2)","trivia":"The Darksaber returns to Mandalorian hands."},{"e":3,"title":"In the Name of the Rebellion (Pt.1)","trivia":"The team plans to disrupt Imperial recruitment on Lothal."},{"e":4,"title":"In the Name of the Rebellion (Pt.2)","trivia":"A daring extraction under Imperial noses."},{"e":5,"title":"The Occupation","trivia":"Lothal under full Imperial lockdown."},{"e":6,"title":"Flight of the Defender","trivia":"The crew steals a prototype TIE Defender."},{"e":7,"title":"Kindred","trivia":"Introduces the Loth-wolves of Lothal."},{"e":8,"title":"Crawler Commandeers","trivia":"A comedic detour with a massive ore crawler."},{"e":9,"title":"Rebel Assault","trivia":"A costly assault on an Imperial factory complex."},{"e":10,"title":"Jedi Night","trivia":"Kanan sacrifices himself to save the crew."},{"e":11,"title":"DUME","trivia":"The crew mourns Kanan and regroups."},{"e":12,"title":"Wolves and a Door","trivia":"The mystical Loth-wolves guide Ezra toward the finale."},{"e":13,"title":"A World Between Worlds","trivia":"Ezra discovers a realm connecting all moments in time via the Force."},{"e":14,"title":"A Fool's Hope","trivia":"Final battle for Lothal begins."},{"e":15,"title":"Family Reunion and Farewell","trivia":"Series finale — Ezra vanishes with Thrawn, setting up Ahsoka (2023)."}]}]},{"id":"rogue-one","type":"movie","era":"rebellion","title":"Rogue One: A Star Wars Story","meta":"Film (2016)","synopsis":"A rebel band of unlikely heroes unite for a daring mission to steal the plans to the Death Star, the Empire's ultimate weapon of destruction.","characters":"Jyn Erso, Cassian Andor, K-2SO, Chirrut Îmwe, Baze Malbus, Bodhi Rook, Director Krennic, Darth Vader","connections":"Directly precedes A New Hope — its final shot leads straight into the opening of the original 1977 film. Also the direct sequel to Andor Season 2.","trivia":"The film's final Darth Vader corridor scene is widely considered one of the most intense action sequences in the entire franchise."},{"id":"anh","type":"movie","era":"rebellion","title":"Star Wars: A New Hope","meta":"Episode IV (1977)","synopsis":"Luke Skywalker joins forces with a Jedi Knight, a cynical smuggler, and two droids to save the galaxy from the Empire's world-destroying battle station while rescuing a rebel princess.","characters":"Luke Skywalker, Han Solo, Leia Organa, Obi-Wan Kenobi, Darth Vader, Chewbacca, C-3PO, R2-D2","connections":"The film that started it all in 1977. Follows immediately from Rogue One's ending.","trivia":"Originally released simply as 'Star Wars' — the 'Episode IV: A New Hope' subtitle wasn't added on-screen until the 1981 re-release."},{"id":"esb","type":"movie","era":"rebellion","title":"Star Wars: The Empire Strikes Back","meta":"Episode V (1980)","synopsis":"After the Rebels are overpowered by the Empire, Luke Skywalker begins Jedi training with Yoda while his friends are pursued by Darth Vader across the galaxy.","characters":"Luke Skywalker, Han Solo, Leia Organa, Yoda, Darth Vader, Lando Calrissian, Boba Fett","connections":"Widely considered the emotional peak of the original trilogy, delivering the saga's most famous twist.","trivia":"Mark Hamill was not told the 'I am your father' twist until the day of filming the reveal, to preserve his authentic reaction."},{"id":"rotj","type":"movie","era":"rebellion","title":"Star Wars: Return of the Jedi","meta":"Episode VI (1983)","synopsis":"Luke Skywalker leads a rescue mission to save Han Solo from Jabba the Hutt, while the Rebel Alliance prepares to destroy a second, more powerful Death Star.","characters":"Luke Skywalker, Han Solo, Leia Organa, Darth Vader, Emperor Palpatine, Lando Calrissian, Ewoks","connections":"Closes the original trilogy — Vader's redemption and the fall of the Empire's leadership at the second Death Star.","trivia":"The Ewoks were originally conceived as Wookiees, but George Lucas made them smaller so the Rebels' primitive weapons could realistically threaten Imperial forces."},{"id":"mandalorian","type":"show","era":"republic","title":"The Mandalorian","meta":"2019–2023 · 3 Seasons · 24 Episodes","synopsis":"A lone Mandalorian bounty hunter navigates the outer reaches of the galaxy, far from the authority of the New Republic, and finds himself the reluctant guardian of a mysterious Force-sensitive foundling.","characters":"Din Djarin, Grogu, Cara Dune, Greef Karga, Bo-Katan Kryze, Ahsoka Tano, Moff Gideon","connections":"Set five years after Return of the Jedi. Reignited the modern live-action era, launching the interconnected 'Mando-verse' of spinoffs.","trivia":"Grogu's design and mannerisms were kept as one of the most tightly guarded secrets in the show's marketing before the premiere.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Chapter 1: The Mandalorian","trivia":"Introduces Din Djarin and the bounty hunter guild on Nevarro."},{"e":2,"title":"Chapter 2: The Child","trivia":"First real glimpse of Grogu's Force abilities."},{"e":3,"title":"Chapter 3: The Sin","trivia":"Din chooses to rescue the target he was paid to deliver."},{"e":4,"title":"Chapter 4: Sanctuary","trivia":"A detour to a farming village facing raiders."},{"e":5,"title":"Chapter 5: The Gunslinger","trivia":"Introduces a young bounty hunter, Toro Calican, and Fennec Shand."},{"e":6,"title":"Chapter 6: The Prisoner","trivia":"A heist job reunites Din with an old crew."},{"e":7,"title":"Chapter 7: The Reckoning","trivia":"Din returns to Nevarro to confront Moff Gideon."},{"e":8,"title":"Chapter 8: Redemption","trivia":"Season finale — first on-screen appearance of the Darksaber."}]},{"s":2,"label":"Season 2","episodes":[{"e":1,"title":"Chapter 9: The Marshal","trivia":"Reunites with Cobb Vanth and a captured Krayt dragon armor set."},{"e":2,"title":"Chapter 10: The Passenger","trivia":"A dangerous cargo run through Imperial remnant patrols."},{"e":3,"title":"Chapter 11: The Heiress","trivia":"Introduces Bo-Katan Kryze and her Mandalorian allies."},{"e":4,"title":"Chapter 12: The Siege","trivia":"Returns to Nevarro, now under Republic-aligned rule."},{"e":5,"title":"Chapter 13: The Jedi","trivia":"Ahsoka Tano's live-action debut."},{"e":6,"title":"Chapter 14: The Tragedy","trivia":"Boba Fett's live-action return, confirmed alive."},{"e":7,"title":"Chapter 15: The Believer","trivia":"Din works uneasily alongside a former Imperial officer."},{"e":8,"title":"Chapter 16: The Rescue","trivia":"Season finale — Luke Skywalker's surprise live-action rescue."}]},{"s":3,"label":"Season 3","episodes":[{"e":1,"title":"Chapter 17: The Apostate","trivia":"Din seeks redemption for removing his helmet."},{"e":2,"title":"Chapter 18: The Mines of Mandalore","trivia":"Din and Grogu descend into Mandalore's toxic ruins."},{"e":3,"title":"Chapter 19: The Convert","trivia":"Focuses on Bo-Katan rebuilding on Mandalore."},{"e":4,"title":"Chapter 20: The Foundling","trivia":"Mandalorian covert politics and a young foundling in danger."},{"e":5,"title":"Chapter 21: The Pirate","trivia":"Pirates blockade Nevarro's new Republic outpost."},{"e":6,"title":"Chapter 22: Guns for Hire","trivia":"A mercenary job to clear the pirate blockade."},{"e":7,"title":"Chapter 23: The Spies","trivia":"Reveals an Imperial remnant conspiracy closing in on Mandalore."},{"e":8,"title":"Chapter 24: The Return","trivia":"Season finale — the Mandalorians reclaim their homeworld."}]}]},{"id":"boba-fett","type":"show","era":"republic","title":"The Book of Boba Fett","meta":"2021 · 1 Season · 7 Episodes","synopsis":"Legendary bounty hunter Boba Fett and mercenary Fennec Shand navigate the galaxy's underworld as they carve out territory as the new rulers of Jabba the Hutt's former domain on Tatooine.","characters":"Boba Fett, Fennec Shand, Din Djarin, Cad Bane, Cobb Vanth","connections":"Spun off from The Mandalorian; two mid-season episodes effectively function as Mandalorian Season 2.5, folding both shows into one storyline.","trivia":"Boba Fett's survival of the sarlacc pit — long a fan theory since the Legends-era novels — was fully canonized by this series.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Chapter 1: Stranger in a Strange Land","trivia":"Establishes Boba as Tatooine's new crime boss, intercut with sarlacc-pit survival flashbacks."},{"e":2,"title":"Chapter 2: The Tribes of Tatooine","trivia":"Boba earns respect from the Tusken Raiders."},{"e":3,"title":"Chapter 3: The Streets of Mos Espa","trivia":"Rival crime families challenge Boba's new territory."},{"e":4,"title":"Chapter 4: The Gathering Storm","trivia":"Fennec Shand brokers a dangerous alliance with the Hutts."},{"e":5,"title":"Chapter 5: Return of the Mandalorian","trivia":"A full Din Djarin-focused episode, effectively \"Mandalorian\" Season 2.5."},{"e":6,"title":"Chapter 6: From the Desert Comes a Stranger","trivia":"Luke Skywalker trains Grogu; Cad Bane's live-action debut."},{"e":7,"title":"Chapter 7: In the Name of Honor","trivia":"Season finale — the battle for Mos Espa against the Pyke Syndicate."}]}]},{"id":"ahsoka","type":"show","era":"republic","title":"Ahsoka","meta":"2023 · 1 Season · 8 Episodes","synopsis":"Ahsoka Tano investigates a growing threat to the New Republic, tracking down Grand Admiral Thrawn before his return can ignite a new war across the galaxy.","characters":"Ahsoka Tano, Sabine Wren, Ezra Bridger, Grand Admiral Thrawn, Hera Syndulla, Baylan Skoll","connections":"The live-action continuation of Star Wars Rebels — resolves Ezra and Thrawn's fate from that series' finale.","trivia":"Composer Kevin Kiner rearranged musical themes directly from Star Wars Rebels throughout the score to underline the series' animated roots.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"Part One: Master and Apprentice","trivia":"Ahsoka and Sabine investigate a map to Thrawn's exile location."},{"e":2,"title":"Part Two: Toil and Trouble","trivia":"Morgan Elsbeth and Baylan Skoll pursue the same star map."},{"e":3,"title":"Part Three: Time to Fly","trivia":"Sabine trains in secret, defying Ahsoka's wishes."},{"e":4,"title":"Part Four: Fallen Jedi","trivia":"A major lightsaber duel forces Ahsoka into the World Between Worlds."},{"e":5,"title":"Part Five: Shadow Warrior","trivia":"Ahsoka reunites with Anakin's spirit for closure and training."},{"e":6,"title":"Part Six: Far, Far Away","trivia":"Ezra Bridger is finally found, stranded in the Rukh-controlled galaxy."},{"e":7,"title":"Part Seven: Dreams and Madness","trivia":"Thrawn moves to escape exile as the heroes close in."},{"e":8,"title":"Part Eight: The Jedi, the Witch, and the Warlord","trivia":"Season finale — Thrawn and Ezra vanish together into unknown space."}]}]},{"id":"skeleton-crew","type":"show","era":"republic","title":"Star Wars: Skeleton Crew","meta":"2024 · 1 Season · 8 Episodes","synopsis":"Four kids from a quiet suburban planet get lost in the galaxy and must find their way home, guided reluctantly by a mysterious adult named Jod Na Nawood.","characters":"Wim, Neel, KB, Fern, Jod Na Nawood, SM-33","connections":"A Goonies-style adventure set in the New Republic era, loosely overlapping with The Mandalorian's timeframe.","trivia":"Jude Law's character Jod was teased in marketing as possibly being a Jedi, feeding fan speculation throughout the show's release.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"STAY ON BOARD","trivia":"Four kids accidentally launch a buried ship and get lost in hyperspace."},{"e":2,"title":"Way, Way Out","trivia":"The crew crash-lands and meets the scoundrel Jod."},{"e":3,"title":"Diplomatic Preet","trivia":"A tense standoff aboard a pirate vessel."},{"e":4,"title":"Can't Say I Remember","trivia":"Jod's murky past starts to surface."},{"e":5,"title":"Zero Friends Again","trivia":"The kids split up, each testing their own courage."},{"e":6,"title":"Song of the Guardians","trivia":"A legendary hidden hyperspace route is revealed."},{"e":7,"title":"The Real Threat","trivia":"Jod's true motives finally come into focus."},{"e":8,"title":"Precious Cargo","trivia":"Season finale — the kids finally attempt the journey home."}]}]},{"id":"mando-grogu","type":"movie","era":"republic","title":"Star Wars: The Mandalorian and Grogu","tmdbTitle":"The Mandalorian and Grogu","meta":"Upcoming Film (2026)","synopsis":"The first Star Wars theatrical film since The Rise of Skywalker, continuing Din Djarin and Grogu's story on the big screen.","characters":"Din Djarin, Grogu, and returning cast from The Mandalorian","connections":"A direct continuation of The Mandalorian television series, elevated to feature-film scale.","trivia":"Marks the first mainline Star Wars theatrical release in years, following a string of streaming-exclusive series."},{"id":"resistance","type":"show","era":"firstorder","title":"Star Wars Resistance","meta":"2018–2020 · 2 Seasons · 40 Episodes","synopsis":"Kazuda Xiono, a young pilot recruited by the Resistance, goes undercover to spy on the growing First Order threat aboard a fueling platform called the Colossus.","characters":"Kazuda Xiono, Poe Dameron, Neeku Vozo, Tam Ryvora, BB-8, Kylo Ren","connections":"Runs parallel to the sequel trilogy timeline, set between The Force Awakens and The Last Jedi, with the finale bridging directly into The Rise of Skywalker's opening chaos.","trivia":"Uses a distinct anime-influenced art style, a notable visual departure from every other animated Star Wars series.","seasons":[{"s":1,"label":"Season 1","episodes":[{"e":1,"title":"The Recruit","trivia":"Poe Dameron recruits Kaz for an undercover Resistance mission."},{"e":2,"title":"The Triple Dark","trivia":"Kaz learns to fly the Fireball racer to keep his cover."},{"e":3,"title":"Fuel for the Fire","trivia":"Introduces the Colossus platform's fuel politics."},{"e":4,"title":"The Bibble Break-In","trivia":"A break-in to recover stolen technology."},{"e":5,"title":"Signal from Sector Six","trivia":"A distress signal draws Kaz into First Order territory."},{"e":6,"title":"The High Tower","trivia":"Kaz infiltrates the Office of Acquisitions."},{"e":7,"title":"The Children of Amaya","trivia":"Aces racing culture and rivalries deepen."},{"e":8,"title":"Secrets and Holograms","trivia":"Kaz's cover is nearly blown by his own recordings."},{"e":9,"title":"Homecoming","trivia":"Tam's backstory and ties to the Colossus are explored."},{"e":10,"title":"The Doza Dilemma","trivia":"Captain Doza's neutrality policy is tested."},{"e":11,"title":"The Platform Classic","trivia":"A high-stakes race threatens to expose Kaz."},{"e":12,"title":"Station Theta Black","trivia":"The First Order tightens surveillance nearby."},{"e":13,"title":"Synara's Score","trivia":"Synara San's pirate loyalties are tested."},{"e":14,"title":"The Escape","trivia":"A First Order raid forces the Colossus to flee."},{"e":15,"title":"The Voxyn Hunt","trivia":"A dangerous creature hunt threatens the crew."},{"e":16,"title":"The New Trooper","trivia":"A First Order defector storyline begins."},{"e":17,"title":"The Disappeared","trivia":"Colossus crew members mysteriously vanish."},{"e":18,"title":"The Core Problem","trivia":"A mechanical crisis threatens the platform's survival."},{"e":19,"title":"No Escape (Pt. 1)","trivia":"First Order forces move to seize the Colossus."},{"e":20,"title":"No Escape (Pt. 2)","trivia":"Season finale — the Colossus barely escapes First Order capture."}]},{"s":2,"label":"Season 2","episodes":[{"e":1,"title":"Into the Unknown","trivia":"The Colossus becomes a mobile refugee platform on the run."},{"e":2,"title":"A New Home","trivia":"The crew searches desperately for safe harbor."},{"e":3,"title":"Live Fire","trivia":"Resistance recruits begin combat training."},{"e":4,"title":"Descent","trivia":"The Colossus submerges to hide from First Order patrols."},{"e":5,"title":"Home Again","trivia":"A tense return to a former ally's territory."},{"e":6,"title":"The Relic Raiders","trivia":"A side mission for ancient technology."},{"e":7,"title":"The Engine Break-Down","trivia":"A critical platform malfunction endangers everyone aboard."},{"e":8,"title":"A Quick Salvage Run","trivia":"The crew risks a run through contested space for parts."},{"e":9,"title":"The Mutiny","trivia":"Internal conflict threatens to fracture the crew."},{"e":10,"title":"The Investiture","trivia":"Captain Doza's authority is challenged."},{"e":11,"title":"First Order Occupation","trivia":"The First Order formally seizes control nearby."},{"e":12,"title":"The First Order Occupation (cont.)","trivia":"Resistance sympathizers organize under the occupation."},{"e":13,"title":"Live Fire (cont.)","trivia":"Escalating skirmishes test the fledgling Resistance cell."},{"e":14,"title":"Chandrila Academy","trivia":"Ties back to New Republic political institutions."},{"e":15,"title":"The Voxyn Hunt (cont.)","trivia":"Creature threats resurface amid wartime chaos."},{"e":16,"title":"Station Theta Black (cont.)","trivia":"First Order listening posts expand their reach."},{"e":17,"title":"The Escape (cont.)","trivia":"A desperate breakout as the noose tightens."},{"e":18,"title":"The Job","trivia":"A risky heist to fund the Resistance cell."},{"e":19,"title":"The New Republic","trivia":"The wider galactic war intrudes directly on Kaz's mission."},{"e":20,"title":"The Escape (Finale)","trivia":"Series finale — the story folds directly into The Rise of Skywalker's opening war."}]}]},{"id":"tfa","type":"movie","era":"firstorder","title":"Star Wars: The Force Awakens","meta":"Episode VII (2015)","synopsis":"As a new threat, the First Order, rises from the ashes of the Empire, a scavenger and a rogue stormtrooper find themselves swept up in the search for the missing Luke Skywalker.","characters":"Rey, Finn, Poe Dameron, Kylo Ren, Han Solo, Leia Organa, BB-8","connections":"Launches the sequel trilogy, thirty years after Return of the Jedi.","trivia":"BB-8's practical rolling-droid effects were achieved with a real remote-controlled ball-droid built for the production, minimizing CGI."},{"id":"tlj","type":"movie","era":"firstorder","title":"Star Wars: The Last Jedi","meta":"Episode VIII (2017)","synopsis":"Rey seeks out the reclusive Luke Skywalker for Jedi training, while the Resistance makes a desperate last stand against the First Order's relentless pursuit.","characters":"Rey, Luke Skywalker, Kylo Ren, Leia Organa, Finn, Poe Dameron, Rose Tico","connections":"The most divisive entry among fans for its subversion of expectations set up in The Force Awakens.","trivia":"Mark Hamill has been publicly candid that he disagreed with several creative choices for Luke's characterization, despite delivering the performance as directed."},{"id":"tros","type":"movie","era":"firstorder","title":"Star Wars: The Rise of Skywalker","meta":"Episode IX (2019)","synopsis":"The surviving Resistance faces the First Order once more as Rey, Finn, and Poe race to end the war — and discover the truth of a returned Emperor Palpatine.","characters":"Rey, Finn, Poe Dameron, Kylo Ren, Emperor Palpatine, General Hux, Lando Calrissian","connections":"Closes out the nine-film Skywalker Saga that began with The Phantom Menace in 1999.","trivia":"Incorporated unused archival footage of Carrie Fisher from The Force Awakens to write Leia into the film following her passing in 2016."}],"archive":[{"id":"acolyte","title":"The Acolyte","meta":"Series (2024) · Season 1 · High Republic Era","trivia":"Set roughly 100 years before the prequels, at the height of the High Republic — the furthest back the live-action timeline has gone.","synopsis":"A former Jedi confronts her dark past when a mysterious assailant with a lethal connection to her history begins hunting down Jedi Knights.","connections":"Bridges the High Republic era into the Skywalker Saga proper; ties into Yoda's backstory and foreshadows the Jedi Order's blind spots that let Palpatine rise unnoticed."},{"id":"tpm","title":"Star Wars: The Phantom Menace","meta":"Episode I (1999)","trivia":"Introduced midi-chlorians, pod-racing, and a nine-year-old Anakin Skywalker to the saga.","synopsis":"Two Jedi escape a hostile blockade to find allies and come across a young boy who may bring balance to the Force — or destroy it.","connections":"Opens the Skywalker Saga. Plants Palpatine's rise, introduces Obi-Wan/Qui-Gon, and starts Anakin's arc."},{"id":"aotc","title":"Star Wars: Attack of the Clones","meta":"Episode II (2002)","trivia":"The clone army was secretly commissioned a decade before the war it would fight even began.","synopsis":"Amid a growing separatist movement, Obi-Wan investigates an assassination attempt on Senator Padmé Amidala and discovers a secret clone army built for the Republic.","connections":"Sets up the Clone Wars, the Anakin–Padmé romance, and Dooku's fall to the dark side."},{"id":"cw-movie","title":"Star Wars: The Clone Wars (Movie)","meta":"Film (2008) · Entry point for the animated series","trivia":"Originally intended as three television episodes stitched together and released theatrically to launch the series.","synopsis":"Anakin Skywalker is assigned a Padawan, Ahsoka Tano, as the Jedi wage war to rescue Jabba the Hutt's kidnapped son.","connections":"Direct lead-in to The Clone Wars series; introduces Ahsoka Tano."},{"id":"toj","title":"Star Wars: Tales of the Jedi","meta":"Anthology (2022) · 6 shorts","trivia":"Told out of chronological order on purpose — pairing Ahsoka and Dooku origin shorts back to back for thematic contrast.","synopsis":"Animated shorts spanning decades, exploring the pivotal moments that shaped Ahsoka Tano and Count Dooku's journeys through the Jedi Order.","connections":"Fills in Dooku's fall and Ahsoka's earliest history, best watched interleaved with the Clone Wars run."},{"id":"rots","title":"Star Wars: Revenge of the Sith","meta":"Episode III (2005)","trivia":"The only entry marked as a hard chronological event inside the old Clone Wars log — everything before it funnels toward this film.","synopsis":"As the Clone Wars rage, Anakin Skywalker is seduced by the dark side, Order 66 is executed, and the Galactic Republic falls to the Empire.","connections":"The hinge point of the entire saga — the fall of the Republic, the birth of Darth Vader, and the scattering of the surviving Jedi into hiding."},{"id":"toe","title":"Star Wars: Tales of the Empire","meta":"Anthology (2024) · 6 shorts","trivia":"Follows two former Jedi/Nightsister women — Morgan Elsbeth and Barriss Offee — on opposite paths through the early Empire.","synopsis":"Follows Morgan Elsbeth's rise under the Empire and Barriss Offee's fight for survival after her fall from the Jedi Order.","connections":"Bridges Revenge of the Sith into the early-Empire period; Elsbeth reappears in The Mandalorian and Ahsoka."},{"id":"tou","title":"Star Wars: Tales of the Underworld","meta":"Anthology (2025) · 6 shorts","trivia":"Centers on Asajj Ventress and Cad Bane, two of the Clone Wars era's most popular bounty-hunter antagonists.","synopsis":"Asajj Ventress forges a new path as a bounty hunter for hire while Cad Bane cements his reputation as the galaxy's most feared gun for hire.","connections":"Closes out the underworld side-stories of the Clone Wars cast right as the Empire tightens its grip."}],"cw":[{"id":"06","title":"Cat and Mouse","s":2,"e":16,"arc":"Crystal Crisis","trivia":"The official starting point of the Clone Wars chronology."},{"id":"07","title":"Hidden Enemy","s":1,"e":16,"arc":"Crystal Crisis","trivia":"Reveals a traitor among the clones on Christophsis."},{"id":"08","title":"Tales: Life and Death","arc":"Ahsoka","trivia":"Shows Ahsoka's birth and her first encounter with a predator."},{"id":"09","title":"The Clone Wars Movie","arc":"Ahsoka","trivia":"Anakin is assigned a Padawan, much to his surprise."},{"id":"10","title":"Dooku Captured","s":1,"e":11,"arc":"Hondo","trivia":"Hondo Ohnaka manages to capture both Anakin and Dooku."},{"id":"11","title":"The Gungan General","s":1,"e":12,"arc":"Hondo","trivia":"Jar Jar Binks accidentally saves the day."},{"id":"12","title":"Supply Lines","s":3,"e":3,"arc":"Ryloth","trivia":"Bail Organa negotiates with King Katuunko."},{"id":"13","title":"Ambush","s":1,"e":1,"arc":"Ryloth","trivia":"Yoda shows clones that their names are more important than numbers."},{"id":"14","title":"Storm over Ryloth","s":1,"e":19,"arc":"Ryloth","trivia":"Ahsoka learns the heavy burden of command."},{"id":"15","title":"Innocents of Ryloth","s":1,"e":20,"arc":"Ryloth","trivia":"The clones Waxer and Boil find the child Numa."},{"id":"16","title":"Liberty on Ryloth","s":1,"e":21,"arc":"Ryloth","trivia":"Mace Windu takes Lessu with a tactical bridge play."},{"id":"17","title":"Death Trap","s":2,"e":20,"arc":"Boba","trivia":"Young Boba Fett infiltrates a Jedi cruiser."},{"id":"18","title":"R2 Come Home","s":2,"e":21,"arc":"Boba","trivia":"R2-D2 defends Anakin and Mace from bounty hunters."},{"id":"19","title":"Lethal Trackdown","s":2,"e":22,"arc":"Boba","trivia":"Plo Koon tracks Boba to Florrum."},{"id":"20","title":"Assassin","s":3,"e":7,"trivia":"Ahsoka has visions of Aurra Sing's assassination attempt."},{"id":"21","title":"Mercy Mission","s":4,"e":5,"arc":"Droids","trivia":"C-3PO and R2 visit the Aleena underground."},{"id":"22","title":"Nomad Droids","s":4,"e":6,"arc":"Droids","trivia":"A bizarre odyssey for the droid duo."},{"id":"23","title":"Evil Plans","s":3,"e":8,"arc":"Bane","trivia":"Cad Bane kidnaps the droids for a shopping list."},{"id":"24","title":"Hostage Crisis","s":1,"e":22,"arc":"Bane","trivia":"Bane takes the Senate hostage."},{"id":"25","title":"Hunt for Ziro","s":3,"e":9,"arc":"Bane","trivia":"The Jedi hunt for Ziro the Hutt."},{"id":"26","title":"Bounty Hunters","s":2,"e":17,"trivia":"Honors the legendary Seven Samurai."},{"id":"27","title":"Holocron Heist","s":2,"e":1,"arc":"Holocron","trivia":"Bane breaks into the Jedi Temple."},{"id":"28","title":"Cargo of Doom","s":2,"e":2,"arc":"Holocron","trivia":"A zero-gravity battle for a Jedi Holocron."},{"id":"29","title":"Children of the Force","s":2,"e":3,"arc":"Holocron","trivia":"Bane attempts to kidnap Force-sensitive babies."},{"id":"30","title":"Lightsaber Lost","s":2,"e":11,"trivia":"Ahsoka learns from the wise Tera Sinube."},{"id":"31","title":"Grievous Intrigue","s":2,"e":9,"arc":"Deserter","trivia":"Eeth Koth is captured by General Grievous."},{"id":"32","title":"The Deserter","s":2,"e":10,"arc":"Deserter","trivia":"Rex finds Cut Lawquane, a clone who started a family."},{"id":"33","title":"Rising Malevolence","s":1,"e":2,"arc":"Malevolence","trivia":"Introduction of the Subjugator-class cruiser."},{"id":"34","title":"Shadow of Malevolence","s":1,"e":3,"arc":"Malevolence","trivia":"Anakin leads a Y-wing squadron into the nebula."},{"id":"35","title":"Destroy Malevolence","s":1,"e":4,"arc":"Malevolence","trivia":"The final fate of Grievous' secret weapon."},{"id":"36","title":"Bombad Jedi","s":1,"e":8,"arc":"Nute","trivia":"Jar Jar saves Rodia from Nute Gunray."},{"id":"37","title":"Cloak of Darkness","s":1,"e":9,"arc":"Nute","trivia":"Ventress rescues Gunray from Jedi custody."},{"id":"38","title":"Lair of Grievous","s":1,"e":10,"arc":"Nute","trivia":"Kit Fisto explores Grievous' private sanctuary."},{"id":"39","title":"Trespass","s":1,"e":15,"trivia":"A winter conflict on Orto Plutonia."},{"id":"40","title":"Senate Spy","s":2,"e":4,"trivia":"Anakin's jealousy interferes with a mission."},{"id":"41","title":"Sphere of Influence","s":3,"e":4,"trivia":"Chairman Papanoida's daughters are kidnapped."},{"id":"42","title":"Landing at Point Rain","s":2,"e":5,"arc":"Geonosis","trivia":"A massive, cinematic return to the Geonosian dunes."},{"id":"43","title":"Weapons Factory","s":2,"e":6,"arc":"Geonosis","trivia":"Ahsoka and Barriss Offee team up."},{"id":"44","title":"Legacy of Terror","s":2,"e":7,"arc":"Geonosis","trivia":"The search for Luminara leads into zombie territory."},{"id":"45","title":"Brain Invaders","s":2,"e":8,"arc":"Geonosis","trivia":"Mind-controlling worms infect the clone ship."},{"id":"46","title":"Downfall of a Droid","s":1,"e":6,"arc":"R2","trivia":"Anakin refuses to wipe R2-D2's memory."},{"id":"47","title":"Duel of the Droids","s":1,"e":7,"arc":"R2","trivia":"R2-D2 fights his replacement, Goldie."},{"id":"48","title":"Blue Shadow Virus","s":1,"e":17,"arc":"Naboo","trivia":"A mad scientist recreates a deadly ancient virus."},{"id":"49","title":"Mystery of a Thousand Moons","s":1,"e":18,"arc":"Naboo","trivia":"Anakin hunts for the root of the cure."},{"id":"50","title":"Jedi Crash","s":1,"e":13,"arc":"Lurmen","trivia":"A damaged ship crashes on Maridun."},{"id":"51","title":"Defenders of Peace","s":1,"e":14,"arc":"Lurmen","trivia":"The Jedi debate pacifism with the Lurmen elders."},{"id":"52","title":"The Mandalore Plot","s":2,"e":12,"arc":"Mandalore","trivia":"Obi-Wan reunites with Duchess Satine."},{"id":"53","title":"Voyage of Temptation","s":2,"e":13,"arc":"Mandalore","trivia":"A cruise to Coruscant full of assassins."},{"id":"54","title":"Duchess of Mandalore","s":2,"e":14,"arc":"Mandalore","trivia":"Satine is framed for murder in the Senate."},{"id":"55","title":"Corruption","s":3,"e":5,"arc":"Mandalore","trivia":"Padmé and Satine find a poisoning scandal."},{"id":"56","title":"The Academy","s":3,"e":6,"arc":"Mandalore","trivia":"Ahsoka teaches students on Mandalore."},{"id":"57","title":"Tales: Practice Makes Perfect","trivia":"Ahsoka's training culminates in a major challenge."},{"id":"58","title":"Heroes on Both Sides","s":3,"e":10,"arc":"Politics","trivia":"Ahsoka meets a boy on the Separatist side."},{"id":"59","title":"Pursuit of Peace","s":3,"e":11,"arc":"Politics","trivia":"The Senate debates expanding the clone army."},{"id":"60","title":"A Friend In Need","s":4,"e":14,"arc":"Politics","trivia":"Death Watch returns with a vengeance."},{"id":"61","title":"Senate Murders","s":2,"e":15,"trivia":"Senator Onaconda Farr is assassinated."},{"id":"62","title":"An Old Friend","s":6,"e":5,"arc":"Clovis","trivia":"Rush Clovis asks for Padmé's help."},{"id":"63","title":"The Rise of Clovis","s":6,"e":6,"arc":"Clovis","trivia":"Anakin's dark side comes out against Clovis."},{"id":"64","title":"Crisis at the Heart","s":6,"e":7,"arc":"Clovis","trivia":"Palpatine takes control of the Banking Clan."},{"id":"65","title":"War on Two Fronts","s":5,"e":2,"arc":"Onderon","trivia":"The Jedi train rebels on Onderon."},{"id":"66","title":"Front Runners","s":5,"e":3,"arc":"Onderon","trivia":"The Onderon rebels strike back."},{"id":"67","title":"The Soft War","s":5,"e":4,"arc":"Onderon","trivia":"The battle for public opinion."},{"id":"68","title":"Tipping Points","s":5,"e":5,"arc":"Onderon","trivia":"The cost of freedom on Onderon."},{"id":"69","title":"Kidnapped","s":4,"e":11,"arc":"Slaves","trivia":"Togruta citizens are taken by slavers."},{"id":"70","title":"Slaves of the Republic","s":4,"e":12,"arc":"Slaves","trivia":"Anakin infiltrates the Zygerrian empire."},{"id":"71","title":"Escape from Kadavo","s":4,"e":13,"arc":"Slaves","trivia":"The Jedi liberate the slave planet."},{"id":"72","title":"Padawan Lost","s":3,"e":21,"arc":"Trandoshans","trivia":"Ahsoka is hunted by Trandoshans for sport."},{"id":"73","title":"Wookiee Hunt","s":3,"e":22,"arc":"Trandoshans","trivia":"Chewbacca helps Ahsoka escape."},{"id":"74","title":"Shadow Warrior","s":4,"e":4,"trivia":"Gungan political unrest on Naboo."},{"id":"75","title":"Water War","s":4,"e":1,"arc":"Mon Cala","trivia":"Conflict erupts in the oceans of Mon Cala."},{"id":"76","title":"Gungan Attack","s":4,"e":2,"arc":"Mon Cala","trivia":"Gungans provide deep-sea support."},{"id":"77","title":"Prisoners","s":4,"e":3,"arc":"Mon Cala","trivia":"A young Prince Lee-Char finds his courage."},{"id":"78","title":"Clone Cadets","s":3,"e":1,"arc":"Fives","trivia":"Domino Squad struggles in training."},{"id":"79","title":"Rookies","s":1,"e":5,"arc":"Fives","trivia":"Rishi Outpost defense against commando droids."},{"id":"80","title":"ARC Troopers","s":3,"e":2,"arc":"Fives","trivia":"The battle for Kamino."},{"id":"81","tier":"must","title":"The Citadel","s":3,"e":18,"arc":"Citadel","trivia":"Break-in to a legendary Separatist prison."},{"id":"82","tier":"must","title":"Counter Attack","s":3,"e":19,"arc":"Citadel","trivia":"A narrow escape becomes a tragedy."},{"id":"83","tier":"must","title":"Citadel Rescue","s":3,"e":20,"arc":"Citadel","trivia":"Rescue mission to save the survivors."},{"id":"84","tier":"must","title":"Darkness on Umbara","s":4,"e":7,"arc":"Umbara","trivia":"The clones face the shadow planet."},{"id":"85","tier":"must","title":"The General","s":4,"e":8,"arc":"Umbara","trivia":"Pong Krell's brutal leadership."},{"id":"86","tier":"must","title":"Plan of Dissent","s":4,"e":9,"arc":"Umbara","trivia":"Fives defies direct orders."},{"id":"87","tier":"must","title":"Carnage of Krell","s":4,"e":10,"arc":"Umbara","trivia":"The clones turn against a traitorous Jedi."},{"id":"88","tier":"skip","title":"Secret Weapons","s":5,"e":10,"arc":"D-Squad","trivia":"A mission for the droids into Separatist territory."},{"id":"89","tier":"skip","title":"Sunny Day in Void","s":5,"e":11,"arc":"D-Squad","trivia":"A philosophical journey through a desert void."},{"id":"90","tier":"skip","title":"Missing in Action","s":5,"e":12,"arc":"D-Squad","trivia":"Gregor, a clone commando, is found."},{"id":"91","tier":"skip","title":"Point of No Return","s":5,"e":13,"arc":"D-Squad","trivia":"A massive explosion concludes the mission."},{"id":"92","tier":"must","title":"The Unknown","s":6,"e":1,"arc":"Biochips","trivia":"A clone's biochip malfunctions."},{"id":"93","tier":"must","title":"Conspiracy","s":6,"e":2,"arc":"Biochips","trivia":"Fives investigates the Kaminoan labs."},{"id":"94","tier":"must","title":"Fugitive","s":6,"e":3,"arc":"Biochips","trivia":"Fives is on the run from the Republic."},{"id":"95","tier":"must","title":"Orders","s":6,"e":4,"arc":"Biochips","trivia":"The tragic end of the inhibitor chip investigation."},{"id":"96","tier":"recommended","title":"Deception","s":4,"e":15,"arc":"Hardcase","trivia":"Obi-Wan goes undercover in prison."},{"id":"97","tier":"recommended","title":"Friends and Enemies","s":4,"e":16,"arc":"Hardcase","trivia":"Anakin hunts his master's 'killer'."},{"id":"98","tier":"recommended","title":"The Box","s":4,"e":17,"arc":"Hardcase","trivia":"A deadly gauntlet for bounty hunters."},{"id":"99","tier":"recommended","title":"Crisis on Naboo","s":4,"e":18,"arc":"Hardcase","trivia":"A plot to kidnap Palpatine is foiled."},{"id":"100","tier":"recommended","title":"The Gathering","s":5,"e":6,"arc":"Younglings","trivia":"Younglings find their Kyber crystals."},{"id":"101","tier":"recommended","title":"A Test of Strength","s":5,"e":7,"arc":"Younglings","trivia":"The kids defend themselves against pirates."},{"id":"102","tier":"recommended","title":"Bound for Rescue","s":5,"e":8,"arc":"Younglings","trivia":"Ahsoka is captured by Hondo."},{"id":"103","tier":"recommended","title":"A Necessary Bond","s":5,"e":9,"arc":"Younglings","trivia":"Jedi and Pirates team up against Grievous."},{"id":"104","tier":"must","title":"Nightsisters","s":3,"e":12,"arc":"Maul","trivia":"Asajj Ventress returns to Dathomir."},{"id":"105","tier":"must","title":"Monster","s":3,"e":13,"arc":"Maul","trivia":"Savage Opress is created."},{"id":"106","tier":"must","title":"Witches of the Mist","s":3,"e":14,"arc":"Maul","trivia":"Anakin and Obi-Wan hunt for Savage."},{"id":"107","tier":"must","title":"Massacre","s":4,"e":19,"arc":"Maul","trivia":"Grievous destroys the Nightsisters."},{"id":"108","tier":"must","title":"Bounty","s":4,"e":20,"arc":"Maul","trivia":"Ventress joins Boba Fett's crew."},{"id":"109","tier":"must","title":"Brothers","s":4,"e":21,"arc":"Maul","trivia":"Savage finds Maul living in the trash."},{"id":"110","tier":"skip","title":"Disappeared Pt 1","s":6,"e":8},{"id":"111","tier":"skip","title":"Disappeared Pt 2","s":6,"e":9},{"id":"112","tier":"must","title":"Revenge","s":4,"e":22,"arc":"Maul","trivia":"Maul challenges Obi-Wan on Raydonia."},{"id":"113","tier":"must","title":"Revival","s":5,"e":1,"arc":"Maul","trivia":"Maul and Savage recruit pirates."},{"id":"114","tier":"must","title":"Eminence","s":5,"e":14,"arc":"Maul","trivia":"The Shadow Collective is formed."},{"id":"115","tier":"must","title":"Shades of Reason","s":5,"e":15,"arc":"Maul","trivia":"Maul takes over Mandalore."},{"id":"116","tier":"must","title":"The Lawless","s":5,"e":16,"arc":"Maul","trivia":"The death of Satine Kryze."},{"id":"117","tier":"must","title":"Overlords","s":3,"e":15,"arc":"Mortis","trivia":"The Jedi meet the Force gods."},{"id":"118","tier":"must","title":"Altar of Mortis","s":3,"e":16,"arc":"Mortis","trivia":"Ahsoka is corrupted by the Son."},{"id":"119","tier":"must","title":"Ghosts of Mortis","s":3,"e":17,"arc":"Mortis","trivia":"Anakin sees his future as Vader."},{"id":"119b","tier":"must","title":"Sabotage","s":5,"e":17,"arc":"Ahsoka Fugitive","trivia":"A bombing at the Jedi Temple."},{"id":"120","tier":"must","title":"Jedi Who Knew Too Much","s":5,"e":18,"arc":"Ahsoka Fugitive","trivia":"Ahsoka is framed for murder."},{"id":"121","tier":"must","title":"To Catch a Jedi","s":5,"e":19,"arc":"Ahsoka Fugitive","trivia":"Ahsoka flees into the underworld."},{"id":"122","tier":"must","title":"The Wrong Jedi","s":5,"e":20,"arc":"Ahsoka Fugitive","trivia":"Ahsoka leaves the Jedi Order."},{"id":"123","tier":"must","title":"The Lost One","s":6,"e":10,"arc":"Yoda Quest","trivia":"Sifo-Dyas' fate is revealed."},{"id":"124","tier":"must","title":"Voices","s":6,"e":11,"arc":"Yoda Quest","trivia":"Qui-Gon's voice guides Yoda."},{"id":"125","tier":"must","title":"Destiny","s":6,"e":12,"arc":"Yoda Quest","trivia":"Yoda faces his hubris on a secret planet."},{"id":"126","tier":"must","title":"Sacrifice","s":6,"e":13,"arc":"Yoda Quest","trivia":"Yoda learns the path to immortality."},{"id":"127","tier":"recommended","title":"Gone Trace","s":7,"e":5},{"id":"128","tier":"recommended","title":"Deal No Deal","s":7,"e":6},{"id":"129","tier":"recommended","title":"Dangerous Debt","s":7,"e":7},{"id":"130","tier":"recommended","title":"Together Again","s":7,"e":8},{"id":"131","tier":"recommended","title":"Bad Batch Arc","s":7,"e":1},{"id":"132","tier":"recommended","title":"Distant Echo","s":7,"e":2},{"id":"133","tier":"recommended","title":"Keeradaks","s":7,"e":3},{"id":"134","tier":"recommended","title":"Unfinished Business","s":7,"e":4},{"id":"135","tier":"must","title":"Old Friends","s":7,"e":9,"arc":"Siege","trivia":"The final mission begins."},{"id":"136","tier":"must","title":"Phantom Apprentice","s":7,"e":10,"arc":"Siege","trivia":"Ahsoka vs Maul on Mandalore."},{"id":"rots-event","tier":"must","title":"Revenge of the Sith","isEvent":true,"trivia":"The Fall of the Republic and the birth of Vader."},{"id":"137","tier":"must","title":"Shattered","s":7,"e":11,"arc":"Siege","trivia":"Order 66 begins."},{"id":"138","tier":"must","title":"Victory and Death","s":7,"e":12,"arc":"Siege","trivia":"The series finale."}],"extras":{"posters":[{"title":"Official Poster Archive — Wookieepedia","url":"https://starwars.fandom.com/wiki/Category:Theatrical_release_posters","blurb":"Every theatrical and promotional poster, organized by film."},{"title":"StarWars.com Screensavers & Art","url":"https://www.starwars.com/news/tag/wallpapers","blurb":"Official wallpapers, key art, and character posters from Lucasfilm."},{"title":"The Art of Star Wars (Databank)","url":"https://www.starwars.com/databank","blurb":"Concept art and character databank spanning every era."}],"videos":[{"title":"Star Wars — Official YouTube Channel","url":"https://www.youtube.com/@StarWars","blurb":"Trailers, behind-the-scenes featurettes, and The Star Wars Show archive."},{"title":"Easter Eggs & Connections Explained","url":"https://www.youtube.com/results?search_query=star+wars+easter+eggs+explained","blurb":"Curated search for the deep-cut references across shows and films."},{"title":"Star Wars: Timeline Explained (by Era)","url":"https://www.youtube.com/results?search_query=star+wars+timeline+explained","blurb":"Video breakdowns of the full in-universe chronology."}],"podcasts":[{"title":"The Star Wars Show Podcast","url":"https://www.starwars.com/tags/the-star-wars-show","blurb":"Lucasfilm's own weekly rundown of news, interviews, and deep dives."},{"title":"Skytalkers","url":"https://skytalkerspodcast.com/","blurb":"Analysis-driven podcast digging into saga themes and fan culture."},{"title":"Fully Operational","url":"https://fullyoperational.com/","blurb":"A long-running, episode-by-episode Star Wars watch podcast."}],"factoids":["The Wilhelm Scream — a stock sound effect used in nearly every Star Wars film — first appeared in A New Hope and has become a running tradition in Lucasfilm productions.","Chewbacca's voice is a blended mix of recordings from walruses, bears, badgers, lions, and tigers.","The Sarlacc pit's design was inspired by a Georgia O'Keeffe painting that George Lucas admired.","Yoda was originally considered for a monkey-and-mask puppet built around trained orangutan Pongo before Frank Oz's now-iconic puppet was chosen instead.","Darth Vader's breathing sound was created by sound designer Ben Burtt using a scuba regulator.","The Millennium Falcon's cockpit was deliberately built off-center so it wouldn't look like a conventional, symmetrical starship.","Grand Admiral Thrawn was one of the first Star Wars Legends (formerly EU) characters ever brought back into official Disney canon.","Lightsaber sound effects were created by combining the hum of an idling film projector motor with interference from a broken TV signal."],"trivia_bites":["Order 66's number was reportedly chosen simply because it fit thematically with the ominous number 6 — there's no deeper numerological meaning confirmed by Lucasfilm.","R2-D2's name allegedly comes from a film-reel request during American Graffiti: 'Reel 2, Dialogue 2' — abbreviated 'R2D2' on set.","Ewoks speak a constructed language based partly on the real-world Kalmyk-Oirat Mongolian language, recorded from a native speaker for authenticity.","The Death Star trench run sequence was influenced by real WWII dogfighting footage that George Lucas studied while storyboarding A New Hope."]}};
+
+var KEY = 'star-wars-watch-order:v8';          // same save format as the original Holocron v8
+var PREFS = 'star-wars-watch-order:prefs';
+var ERAS = {
+  batch:      { label: 'Reign of the Empire', color: 'var(--batch)' },
+  rebellion:  { label: 'Age of Rebellion',    color: 'var(--rebellion)' },
+  republic:   { label: 'New Republic',        color: 'var(--republic)' },
+  firstorder: { label: 'First Order Era',     color: 'var(--firstorder)' }
+};
+var $ = function (id) { return document.getElementById(id); };
+var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- tiny DOM helper: text is always set as text, never as HTML ---------- */
+function h(tag, props) {
+  var e = document.createElement(tag);
+  props = props || {};
+  Object.keys(props).forEach(function (k) {
+    var v = props[k];
+    if (v == null || v === false) return;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  });
+  for (var i = 2; i < arguments.length; i++) {
+    var c = arguments[i];
+    if (c == null || c === false) continue;
+    if (Array.isArray(c)) c.forEach(function (x) { if (x != null && x !== false) e.append(x); });
+    else e.append(c);
+  }
+  return e;
+}
+
+/* ---------- state ---------- */
+var items = DATA.active.map(function (it) {
+  if (it.type === 'movie') return Object.assign({}, it, { watched: false });
+  return Object.assign({}, it, {
+    expanded: false,
+    seasons: it.seasons.map(function (s) {
+      return Object.assign({}, s, { episodes: s.episodes.map(function (e) { return Object.assign({}, e, { watched: false }); }) });
+    })
+  });
+});
+var ui = { era: 'all', hideDone: false, sound: true, select: false, selected: {}, tab: 'active' };
+var focusId = null;
+
+function isUpcoming(it) { return /upcoming/i.test(it.meta || ''); }
+function progress(it) {
+  if (it.type === 'movie') return { done: it.watched ? 1 : 0, total: 1 };
+  var d = 0, t = 0;
+  it.seasons.forEach(function (s) { s.episodes.forEach(function (e) { t++; if (e.watched) d++; }); });
+  return { done: d, total: t };
+}
+function totals() {
+  var d = 0, t = 0;
+  items.forEach(function (it) { var p = progress(it); d += p.done; t += p.total; });
+  return { done: d, total: t };
+}
+function setAll(it, value) {
+  if (it.type === 'movie') it.watched = value;
+  else it.seasons.forEach(function (s) { s.episodes.forEach(function (e) { e.watched = value; }); });
+}
+
+/* ---------- saving (same format as the original app, so saves move both ways) ---------- */
+function payload() {
+  return items.map(function (it) {
+    if (it.type === 'movie') return { id: it.id, w: it.watched };
+    return { id: it.id, expanded: it.expanded, seasons: it.seasons.map(function (s) { return { s: s.s, eps: s.episodes.map(function (e) { return e.watched; }) }; }) };
+  });
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(payload())); } catch (e) { /* storage blocked: progress lasts until the page closes */ } }
+function apply(parsed) {
+  if (!Array.isArray(parsed)) throw new Error('That is not a Holocron save file (expected a list).');
+  var map = {}, known = 0;
+  parsed.forEach(function (d) { if (d && typeof d.id === 'string') map[d.id] = d; });
+  items.forEach(function (it) {
+    var d = map[it.id];
+    if (!d) return;
+    known++;
+    if (it.type === 'movie') { it.watched = d.w === true; return; }
+    it.expanded = d.expanded === true;
+    (Array.isArray(d.seasons) ? d.seasons : []).forEach(function (ss, si) {
+      if (!it.seasons[si] || !ss || !Array.isArray(ss.eps)) return;
+      ss.eps.forEach(function (w, ei) { if (it.seasons[si].episodes[ei]) it.seasons[si].episodes[ei].watched = w === true; });
+    });
+  });
+  if (!known) throw new Error('No entries in that file match this watch list.');
+  return known;
+}
+function load() {
+  try { var s = localStorage.getItem(KEY); if (s) apply(JSON.parse(s)); } catch (e) { /* ignore a corrupt save */ }
+  try { var p = JSON.parse(localStorage.getItem(PREFS) || '{}'); ui.era = ERAS[p.era] ? p.era : 'all'; ui.hideDone = p.hideDone === true; ui.sound = p.sound !== false; } catch (e) {}
+}
+function savePrefs() { try { localStorage.setItem(PREFS, JSON.stringify({ era: ui.era, hideDone: ui.hideDone, sound: ui.sound })); } catch (e) {} }
+
+/* ---------- sound: a quick saber ignition, synthesised (no files, no library) ---------- */
+var actx;
+function ignite() {
+  if (!ui.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(240, t + 0.14);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.32);
+  } catch (e) { /* audio unavailable */ }
+}
+
+/* ---------- starfield ---------- */
+(function () {
+  var cv = $('stars'), cx = cv.getContext('2d'), stars = [], w = 0, hgt = 0;
+  function size() { w = cv.width = innerWidth; hgt = cv.height = innerHeight; }
+  size(); addEventListener('resize', function () { size(); if (reduce) draw(); });
+  for (var i = 0; i < 180; i++) stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + .2, v: Math.random() * 0.00022 + 0.00006 });
+  function draw() {
+    cx.fillStyle = '#04060c'; cx.fillRect(0, 0, w, hgt); cx.fillStyle = '#cbd5e1';
+    stars.forEach(function (s) { cx.globalAlpha = .35 + s.r / 2.2; cx.fillRect(s.x * w, s.y * hgt, s.r, s.r); });
+    cx.globalAlpha = 1;
+  }
+  function frame() { stars.forEach(function (s) { s.x -= s.v; if (s.x < 0) s.x = 1; }); draw(); requestAnimationFrame(frame); }
+  if (reduce) draw(); else frame();
+})();
+
+/* ---------- datafile dialog ---------- */
+var dlg = $('datafile');
+function section(title, text) { return text ? [h('h3', { text: title }), h('p', { text: text })] : null; }
+function openDatafile(node) { var b = $('dbody'); b.replaceChildren(node); dlg.showModal(); b.scrollTop = 0; }
+function itemFile(it) {
+  var era = ERAS[it.era];
+  return h('div', null,
+    era && h('span', { class: 'badge', style: '--c:' + era.color, text: era.label }),
+    h('h2', { id: 'dtitle', text: it.title }), h('p', { class: 'muted', style: 'font-size:.8rem', text: it.meta }),
+    section('Synopsis', it.synopsis), section('Characters', it.characters), section('Timeline connections', it.connections), section('Trivia', it.trivia));
+}
+function epFile(show, s, e) {
+  return h('div', null,
+    h('p', { class: 'muted', style: 'font-size:.75rem', text: show.title + ' · ' + s.label }),
+    h('h2', { id: 'dtitle', text: 'S' + s.s + 'E' + String(e.e).padStart(2, '0') + ' · ' + e.title }),
+    section('Notes', e.trivia || e.synopsis || 'No notes for this episode.'));
+}
+$('dclose').addEventListener('click', function () { dlg.close(); });
+dlg.addEventListener('click', function (ev) { if (ev.target === dlg) dlg.close(); });
+
+/* ---------- actions ---------- */
+function after(id) { focusId = id; render(); save(); }
+function toggleMovie(it) { it.watched = !it.watched; if (it.watched) ignite(); after('chk-' + it.id); }
+function toggleEp(it, si, ei) { var e = it.seasons[si].episodes[ei]; e.watched = !e.watched; if (e.watched) ignite(); after('chk-' + it.id + '-' + si + '-' + ei); }
+function nextEpisode(it) {
+  for (var si = 0; si < it.seasons.length; si++) for (var ei = 0; ei < it.seasons[si].episodes.length; ei++)
+    if (!it.seasons[si].episodes[ei].watched) return { si: si, ei: ei, s: it.seasons[si], e: it.seasons[si].episodes[ei] };
+  return null;
+}
+function nextUp() {
+  for (var i = 0; i < items.length; i++) { var p = progress(items[i]); if (p.done < p.total && !isUpcoming(items[i])) return { it: items[i], n: i + 1 }; }
+  return null;
+}
+
+/* ---------- rendering: header, next up ---------- */
+function renderHeader() {
+  var t = totals(), pc = t.total ? Math.round(t.done / t.total * 100) : 0;
+  $('pct').textContent = pc + '%';
+  $('count').textContent = t.done + ' / ' + t.total + ' logged';
+  $('pfill').style.width = pc + '%';
+  $('pbar').setAttribute('aria-valuenow', pc);
+  $('archline').textContent = 'Sealed archive: ' + DATA.archive.length + ' titles + ' + DATA.cw.length + ' Clone Wars fragments';
+}
+function renderNext() {
+  var box = $('next'), n = nextUp();
+  box.replaceChildren();
+  if (!n) { box.append(h('p', { class: 'disp', style: 'margin:0;color:var(--gold)', text: 'Every listed entry is logged.' }), h('p', { class: 'muted', style: 'margin:0', text: 'Nothing left on the watch list. Check the Extras tab, or wait for the next release.' })); return; }
+  var it = n.it, era = ERAS[it.era], p = progress(it), ne = it.type === 'show' ? nextEpisode(it) : null;
+  box.append(
+    h('span', { class: 'lab disp', text: 'Up next · #' + n.n + ' in watch order' }),
+    h('h2', { text: it.title }),
+    h('div', { class: 'row' }, era && h('span', { class: 'badge', style: '--c:' + era.color, text: era.label }),
+      h('span', { class: 'muted', style: 'font-size:.82rem', text: ne ? 'Next episode: S' + ne.s.s + 'E' + String(ne.e.e).padStart(2, '0') + ' · ' + ne.e.title + ' (' + p.done + '/' + p.total + ' done)' : it.meta })),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn primary', id: 'next-mark', onclick: function () { if (ne) { toggleEp(it, ne.si, ne.ei); } else { toggleMovie(it); } }, text: ne ? 'Mark episode watched' : 'Mark watched' }),
+      h('button', { class: 'btn', onclick: function () { openDatafile(itemFile(it)); }, text: 'Datafile' })));
+}
+
+/* ---------- rendering: the watch list ---------- */
+function renderFilters() {
+  var f = $('filters'); f.replaceChildren();
+  var left = {}; items.forEach(function (it) { var p = progress(it); if (p.done < p.total) left[it.era] = (left[it.era] || 0) + 1; });
+  function chip(key, label, color) {
+    return h('button', { class: 'chip', 'aria-pressed': String(ui.era === key), onclick: function () { ui.era = key; savePrefs(); render(); } },
+      color && h('span', { class: 'dot', style: '--c:' + color }), label);
+  }
+  f.append(chip('all', 'All eras'));
+  Object.keys(ERAS).forEach(function (k) { f.append(chip(k, ERAS[k].label + (left[k] ? ' · ' + left[k] + ' left' : ''), ERAS[k].color)); });
+}
+function selCheckbox(it) {
+  return h('input', { type: 'checkbox', class: 'sel', id: 'sel-' + it.id, 'aria-label': 'Select ' + it.title, checked: ui.selected[it.id] ? true : null,
+    onchange: function () { if (this.checked) ui.selected[it.id] = true; else delete ui.selected[it.id]; focusId = 'sel-' + it.id; render(); } });
+}
+function row(it, n) {
+  var era = ERAS[it.era], p = progress(it), done = p.done === p.total;
+  var lead;
+  if (ui.select) lead = selCheckbox(it);
+  else if (it.type === 'movie') lead = h('input', { type: 'checkbox', id: 'chk-' + it.id, 'aria-label': 'Watched: ' + it.title, checked: it.watched ? true : null, onchange: function () { toggleMovie(it); } });
+  else lead = h('span', { class: 'disp', style: 'width:26px;flex:none;text-align:center;font-size:.6rem;color:' + (done ? 'var(--ok)' : 'var(--gold)'), text: done ? '✓' : p.done + '/' + p.total });
+  var infoBtn = h('button', { class: 'iconbtn', 'aria-label': 'Datafile for ' + it.title, onclick: function (ev) { ev.stopPropagation(); openDatafile(itemFile(it)); }, text: 'i' });
+  var main = h('div', { class: 'info' },
+    h('p', { class: 'title' }, it.title + ' ', era && h('span', { class: 'badge', style: '--c:' + era.color, text: era.label }), isUpcoming(it) && h('span', { class: 'tier', style: 'margin-left:6px', text: 'upcoming' })),
+    h('p', { class: 'meta', text: it.meta + (it.type === 'show' ? ' · ' + p.done + '/' + p.total + ' episodes' : '') }));
+  var head;
+  if (it.type === 'show' && !ui.select) {
+    var toggle = h('button', { class: 'iconbtn', id: 'exp-' + it.id, 'aria-expanded': String(it.expanded), 'aria-label': (it.expanded ? 'Hide' : 'Show') + ' episodes of ' + it.title,
+      onclick: function () { it.expanded = !it.expanded; focusId = 'exp-' + it.id; render(); save(); } }, h('span', { class: 'chev', text: '▾' }));
+    head = h('div', { class: 'head' }, h('span', { class: 'num', text: n }), lead, main, infoBtn, toggle);
+  } else head = h('div', { class: 'head' }, h('span', { class: 'num', text: n }), lead, main, infoBtn);
+  var li = h('li', { class: 'panel item' + (done && !ui.select ? ' done' : '') }, head);
+  if (it.type === 'show') li.append(h('div', { class: 'showbar' }, h('i', { style: 'width:' + Math.round(p.done / p.total * 100) + '%' })));
+  if (it.type === 'show' && it.expanded && !ui.select) {
+    li.append(h('div', { class: 'seasons' }, it.seasons.map(function (s, si) {
+      var sd = s.episodes.filter(function (e) { return e.watched; }).length;
+      return h('div', null, h('h4', { text: s.label + ' · ' + sd + '/' + s.episodes.length }),
+        h('ul', { class: 'eps' }, s.episodes.map(function (e, ei) {
+          var id = 'chk-' + it.id + '-' + si + '-' + ei;
+          return h('li', { class: 'ep' + (e.watched ? ' done' : '') },
+            h('input', { type: 'checkbox', id: id, checked: e.watched ? true : null, onchange: function () { toggleEp(it, si, ei); } }),
+            h('label', { for: id, text: 'S' + s.s + 'E' + String(e.e).padStart(2, '0') + ' · ' + e.title }),
+            h('button', { class: 'iconbtn', style: 'width:30px;height:30px', 'aria-label': 'Notes on ' + e.title, onclick: function () { openDatafile(epFile(it, s, e)); }, text: 'i' }));
+        })));
+    })));
+  }
+  return li;
+}
+function renderList() {
+  var list = $('list'); list.replaceChildren();
+  var shown = 0;
+  items.forEach(function (it, i) {
+    var p = progress(it);
+    if (ui.era !== 'all' && it.era !== ui.era) return;
+    if (ui.hideDone && p.done === p.total) return;
+    shown++; list.append(row(it, i + 1));
+  });
+  if (!shown) list.append(h('li', { class: 'panel empty', text: ui.hideDone ? 'Nothing left to watch in this era.' : 'Nothing in this era.' }));
+  var n = Object.keys(ui.selected).length;
+  $('selbar').hidden = !ui.select; $('selcount').textContent = n + ' selected';
+  var sm = $('selmode'); sm.textContent = ui.select ? 'Cancel selecting' : 'Select several'; sm.setAttribute('aria-pressed', String(ui.select));
+  var snd = $('sound'); snd.textContent = ui.sound ? 'Sound on' : 'Sound off'; snd.setAttribute('aria-pressed', String(ui.sound));
+  $('hidedone').checked = ui.hideDone;
+}
+function render() {
+  renderHeader(); renderNext(); renderFilters(); renderList();
+  $('exp').value = JSON.stringify(payload());
+  if (focusId) { var el = $(focusId); focusId = null; if (el) el.focus({ preventScroll: true }); }
+}
+
+/* ---------- archive + extras (static) ---------- */
+function renderArchive() {
+  var v = $('view-archive'); v.replaceChildren();
+  v.append(h('div', { class: 'panel intro' }, h('h2', { text: 'The Prequel Corner' }),
+    h('p', { class: 'muted', style: 'margin:0;font-size:.88rem', text: 'Sealed history: everything already watched on the first pass, from The Acolyte through Revenge of the Sith, including the complete Clone Wars run. It is not editable, and it does not count towards the Watch next percentage.' })));
+  var list = h('div', { style: 'display:grid;gap:10px' });
+  DATA.archive.forEach(function (g) {
+    list.append(h('details', { class: 'panel group' },
+      h('summary', null, h('span', { class: 'ok-mark', text: '✓' }), h('div', { class: 'info' }, h('p', { class: 'title', text: g.title }), h('p', { class: 'meta', text: g.meta })), h('span', { class: 'chev muted', text: '▾' })),
+      h('div', { style: 'padding:0 16px 16px;display:grid;gap:2px' }, section('Synopsis', g.synopsis), section('Timeline connections', g.connections), section('Trivia', g.trivia))));
+  });
+  var tiers = { must: 0, recommended: 0, skip: 0 }; DATA.cw.forEach(function (e) { if (tiers[e.tier] != null) tiers[e.tier]++; });
+  list.append(h('details', { class: 'panel group' },
+    h('summary', null, h('span', { class: 'ok-mark', text: '✓' }), h('div', { class: 'info' }, h('p', { class: 'title', text: 'Complete Clone Wars chronological log' }),
+      h('p', { class: 'meta', text: DATA.cw.length + ' fragments · the 2008 series plus related shorts, in the order you watched them' })), h('span', { class: 'chev muted', text: '▾' })),
+    h('ol', { class: 'cwlist' }, DATA.cw.map(function (e, i) {
+      return h('li', { class: 'cw' + (e.isEvent ? ' event' : ''), title: e.trivia || null },
+        h('span', { class: 'ok-mark', style: 'width:20px;height:20px;border-radius:6px;font-size:.6rem', text: '✓' }),
+        h('span', { style: 'min-width:0;overflow-wrap:anywhere', text: (e.s ? 'S' + e.s + 'E' + e.e + ' · ' : '') + e.title }),
+        e.tier && h('span', { class: 'tier ' + e.tier, text: e.tier }),
+        e.arc && h('span', { class: 'arc', text: e.arc }));
+    }))));
+  v.append(list);
+}
+function linkCard(x) { return h('a', { class: 'card', href: x.url, target: '_blank', rel: 'noopener noreferrer' }, h('b', { text: x.title + ' ↗' }), h('p', { text: x.blurb })); }
+function renderExtras() {
+  var v = $('view-extras'), X = DATA.extras; v.replaceChildren();
+  v.append(
+    h('div', { class: 'sect', text: 'Poster and art archives' }), h('div', { class: 'cards' }, X.posters.map(linkCard)),
+    h('div', { class: 'sect', text: 'Videos and easter eggs' }), h('div', { class: 'cards' }, X.videos.map(linkCard)),
+    h('div', { class: 'sect', text: 'Podcasts' }), h('div', { class: 'cards' }, X.podcasts.map(linkCard)),
+    h('div', { class: 'sect', text: 'Factoids' }), h('div', { class: 'cards' }, X.factoids.map(function (f) { return h('div', { class: 'panel fact', text: f }); })),
+    h('div', { class: 'sect', text: 'Trivia bites' }), h('div', { class: 'cards' }, X.trivia_bites.map(function (f) { return h('div', { class: 'panel fact i', text: f }); })));
+}
+
+/* ---------- tabs ---------- */
+var TABS = ['active', 'archive', 'extras'], built = {};
+function showTab(name, focus) {
+  ui.tab = name;
+  TABS.forEach(function (t) {
+    var on = t === name;
+    $('tab-' + t).setAttribute('aria-selected', String(on)); $('tab-' + t).tabIndex = on ? 0 : -1; $('view-' + t).hidden = !on;
+  });
+  if (name === 'archive' && !built.archive) { renderArchive(); built.archive = true; }
+  if (name === 'extras' && !built.extras) { renderExtras(); built.extras = true; }
+  $('next').hidden = name !== 'active';
+  if (focus) $('tab-' + name).focus();
+}
+TABS.forEach(function (t, i) {
+  $('tab-' + t).addEventListener('click', function () { showTab(t); });
+  $('tab-' + t).addEventListener('keydown', function (ev) {
+    var d = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : 0;
+    if (d) { ev.preventDefault(); showTab(TABS[(i + d + TABS.length) % TABS.length], true); }
+  });
+});
+
+/* ---------- controls ---------- */
+$('hidedone').addEventListener('change', function () { ui.hideDone = this.checked; savePrefs(); render(); });
+$('sound').addEventListener('click', function () { ui.sound = !ui.sound; savePrefs(); render(); if (ui.sound) ignite(); });
+$('selmode').addEventListener('click', function () { ui.select = !ui.select; ui.selected = {}; render(); });
+function shown() { return items.filter(function (it) { return (ui.era === 'all' || it.era === ui.era) && !(ui.hideDone && progress(it).done === progress(it).total); }); }
+$('selall').addEventListener('click', function () { shown().forEach(function (it) { ui.selected[it.id] = true; }); render(); });
+$('selnone').addEventListener('click', function () { ui.selected = {}; render(); });
+function bulk(value) {
+  var ids = Object.keys(ui.selected); if (!ids.length) return;
+  items.forEach(function (it) { if (ui.selected[it.id]) setAll(it, value); });
+  if (value) ignite();
+  ui.selected = {}; ui.select = false; render(); save();
+}
+$('selwatch').addEventListener('click', function () { bulk(true); });
+$('selunwatch').addEventListener('click', function () { bulk(false); });
+
+function say(text, bad) { var m = $('bmsg'); m.textContent = text; m.className = 'msg' + (bad ? ' err' : ''); }
+$('copy').addEventListener('click', function () {
+  var t = $('exp').value;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { say('Save file copied.'); }, function () { $('exp').select(); say('Select the text and copy it (Ctrl/Cmd+C).', true); });
+});
+$('import').addEventListener('click', function () {
+  var raw = $('imp').value.trim();
+  if (!raw) { say('Paste a save file first.', true); return; }
+  try { var n = apply(JSON.parse(raw)); render(); save(); $('imp').value = ''; say('Imported progress for ' + n + ' entries.'); }
+  catch (e) { say(e instanceof SyntaxError ? 'That text is not valid JSON.' : e.message, true); }
+});
+$('reset').addEventListener('click', function () {
+  if (!confirm('Reset all Watch next progress on this device? The archive is not affected.')) return;
+  items.forEach(function (it) { setAll(it, false); it.expanded = false; });
+  render(); save(); say('Progress reset.');
+});
+
+load();
+render();
+showTab('active');
+})();
+</script>
+</body>
+</html>

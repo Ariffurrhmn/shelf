@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premortem</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Premortem",
+  "description": "Imagine your project already failed, then list why. Plot each cause by likelihood and impact and get a ranked 'fix these first' list.",
+  "created": "2026-11-04",
+  "tool": "Claude",
+  "kind": "app",
+  "thumbnail": "thumbnail.png",
+  "tags": ["planning", "risk", "decisions"],
+  "why": "Looking back from an imagined failure makes people say the risks they would otherwise keep to themselves.",
+  "storage": "local",
+  "notes": "Score is likelihood x impact (1-25). The top three become the fix-first list; each needs a mitigation before it stops being flagged. Everything stays in this browser."
+}
+</script>
+<style>
+  :root { color-scheme: light dark; --bg:#f7f4f0; --card:#fff; --ink:#201c19; --muted:#6a625b; --line:#e0d9d1; --accent:#b4231b; --accent-ink:#fff; --field:#fcfaf8; --g0:#e9f3e4; --g1:#f6f0c8; --g2:#fbdcae; --g3:#f7b8a0; --g4:#ea8f86; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161412; --card:#1f1c19; --ink:#f1ece6; --muted:#a79f96; --line:#35302b; --accent:#ff7a6e; --accent-ink:#2a0c09; --field:#181513; --g0:#25331f; --g1:#3a3818; --g2:#4b3a1b; --g3:#553125; --g4:#6d2a26; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:1060px; margin:0 auto; padding:18px 14px 56px; }
+  h1 { margin:0; font-size:1.55rem; letter-spacing:-.01em; } .lead { color:var(--muted); margin:2px 0 16px; max-width:60ch; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .intro { display:grid; gap:10px; grid-template-columns:1fr 200px; align-items:end; margin-bottom:16px; }
+  @media (max-width:600px) { .intro { grid-template-columns:1fr; } }
+  label.f { display:block; font-size:.78rem; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin-bottom:4px; font-weight:600; }
+  input, select, textarea { width:100%; font:inherit; color:inherit; background:var(--field); border:1px solid var(--line); border-radius:10px; padding:9px 11px; min-height:40px; }
+  textarea { resize:vertical; min-height:60px; }
+  :focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  .scene { font-size:1.05rem; padding:14px 16px; border-left:4px solid var(--accent); background:var(--field); border-radius:0 12px 12px 0; margin-bottom:16px; }
+  .layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:16px; align-items:start; }
+  @media (max-width:860px) { .layout { grid-template-columns:1fr; } }
+  h2 { margin:0 0 10px; font-size:.82rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip, .b { min-height:38px; border:1px solid var(--line); background:var(--card); color:inherit; border-radius:99px; padding:0 13px; font:inherit; font-size:.86rem; cursor:pointer; }
+  .b { border-radius:10px; } .b.p { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700; }
+  .chip:hover, .b:hover { border-color:var(--accent); }
+  .risks { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  .risk { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--field); display:grid; gap:8px; }
+  .risk.hl { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .risk .top { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:start; }
+  .num { width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--card); display:grid; place-items:center; font-weight:800; font-size:.85rem; flex:none; }
+  .two { display:grid; grid-template-columns:1fr 1fr 90px; gap:8px; align-items:end; }
+  .score { text-align:center; font-weight:800; font-size:1.2rem; padding:6px 0; border-radius:10px; }
+  .x { border:0; background:none; color:var(--muted); font-size:1.2rem; cursor:pointer; width:34px; height:34px; border-radius:8px; } .x:hover { color:var(--accent); background:rgba(128,128,128,.12); }
+  .matrix { display:grid; grid-template-columns:auto repeat(5,1fr); grid-template-rows:repeat(5,minmax(46px,1fr)) auto; gap:3px; }
+  .mc { border-radius:8px; display:flex; flex-wrap:wrap; gap:3px; align-items:center; justify-content:center; padding:3px; min-height:46px; }
+  .ax { font-size:.7rem; color:var(--muted); display:flex; align-items:center; justify-content:center; text-align:center; }
+  .dot { width:26px; height:26px; border-radius:50%; border:2px solid var(--card); background:var(--ink); color:var(--card); font-weight:800; font-size:.75rem; cursor:pointer; padding:0; display:grid; place-items:center; }
+  .dot:hover, .dot:focus-visible { transform:scale(1.15); }
+  .axt { font-size:.72rem; color:var(--muted); text-align:center; margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
+  .fix { list-style:none; margin:0; padding:0; display:grid; gap:8px; counter-reset:f; }
+  .fix li { padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:var(--field); }
+  .fix b { display:block; } .fix .m { font-size:.88rem; color:var(--muted); } .fix .warn { color:var(--accent); font-weight:600; font-size:.85rem; }
+  .stats { display:flex; flex-wrap:wrap; gap:6px 18px; color:var(--muted); font-size:.85rem; margin-top:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; } .msg { min-height:1.3em; font-size:.85rem; color:var(--accent); margin:6px 0 0; }
+  .empty { color:var(--muted); padding:8px 2px; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  @media print { .chips, .row, .x, .b, .intro select { display:none !important; } body { background:#fff; color:#000; } .card { border-color:#999; } .layout { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Premortem</h1>
+  <p class="lead">Before you start, imagine it has already gone wrong. It is easier to name the reasons when the failure feels certain.</p>
+  <div class="card intro">
+    <div><label class="f" for="proj">The project</label><input id="proj" maxlength="80" placeholder="e.g. Launch the newsletter" autocomplete="off"></div>
+    <div><label class="f" for="when">Looking back from</label>
+      <select id="when"><option value="in a month">1 month later</option><option value="in 3 months" selected>3 months later</option><option value="in 6 months">6 months later</option><option value="a year from now">1 year later</option></select></div>
+  </div>
+  <p class="scene" id="scene"></p>
+  <div class="layout">
+    <section class="card" aria-label="Reasons it failed">
+      <h2>Why did it fail?</h2>
+      <div class="chips" aria-label="Starter phrases"></div>
+      <ol class="risks" id="risks"></ol>
+      <div class="row"><button class="b p" id="add" type="button">Add a reason</button></div>
+    </section>
+    <div style="display:grid;gap:16px">
+      <section class="card" aria-label="Risk map">
+        <h2>Risk map</h2>
+        <div class="matrix" id="matrix"></div>
+        <p class="axt">Likelihood →</p>
+      </section>
+      <section class="card" aria-label="Fix first">
+        <h2>Fix these first</h2>
+        <ol class="fix" id="fix"></ol>
+        <div class="stats" id="stats"></div>
+        <div class="row"><button class="b" id="copy" type="button">Copy as Markdown</button><button class="b" id="print" type="button">Print</button><button class="b" id="reset" type="button">Start over</button></div>
+        <p class="msg" id="msg" role="status"></p>
+      </section>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'premortem:v1', $ = function (id) { return document.getElementById(id); };
+  var STARTERS = ['We ran out of time because…', 'The one person we depended on…', 'We assumed … but it turned out…', 'Nobody ever decided…', 'It cost more than…', 'People just didn’t…'];
+  var LEVELS = ['', 'Rare', 'Unlikely', 'Possible', 'Likely', 'Almost certain'], IMPACT = ['', 'Minor', 'Moderate', 'Serious', 'Major', 'Fatal'];
+  var state = { project: '', when: 'in 3 months', risks: [] }, nextId = 1, hl = null;
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (s && Array.isArray(s.risks)) {
+        state.project = String(s.project || '').slice(0, 80); state.when = String(s.when || state.when);
+        state.risks = s.risks.slice(0, 40).map(function (r) { return { id: nextId++, text: String(r.text || '').slice(0, 300), l: clamp(r.l), i: clamp(r.i), fix: String(r.fix || '').slice(0, 300) }; });
+      }
+    } catch (e) {}
+  }
+  function clamp(n) { n = Math.round(+n); return n >= 1 && n <= 5 ? n : 3; }
+  function score(r) { return r.l * r.i; }
+  function ranked() { return state.risks.map(function (r, n) { return { r: r, n: n }; }).filter(function (x) { return x.r.text.trim(); }).sort(function (a, b) { return score(b.r) - score(a.r) || b.r.i - a.r.i || a.n - b.n; }); }
+  function color(sc) { return sc >= 20 ? 'var(--g4)' : sc >= 12 ? 'var(--g3)' : sc >= 6 ? 'var(--g2)' : sc >= 3 ? 'var(--g1)' : 'var(--g0)'; }
+  function el(tag, props) { var e = document.createElement(tag); Object.keys(props || {}).forEach(function (k) { if (k === 'text') e.textContent = props[k]; else if (k === 'class') e.className = props[k]; else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), props[k]); else e.setAttribute(k, props[k]); }); for (var i = 2; i < arguments.length; i++) if (arguments[i]) e.append(arguments[i]); return e; }
+
+  function renderScene() {
+    var p = state.project.trim() || 'this project';
+    $('scene').textContent = state.when === 'a year from now' ? 'It is a year from now, and “' + p + '” has failed. Completely. What happened?' : 'It is ' + state.when.replace('in ', '') + ' from now, and “' + p + '” has failed. Completely. What happened?';
+  }
+  function select(name, value, onchange, labels) {
+    var s = el('select', { 'aria-label': name }); for (var v = 1; v <= 5; v++) { var o = el('option', { value: v, text: v + ' · ' + labels[v] }); if (v === value) o.selected = true; s.append(o); }
+    s.addEventListener('change', function () { onchange(+s.value); }); return s;
+  }
+  function renderRisks(focusId) {
+    var ol = $('risks'); ol.replaceChildren();
+    if (!state.risks.length) ol.append(el('li', { class: 'empty', text: 'No reasons yet. Start with a phrase above, or add your own.' }));
+    state.risks.forEach(function (r, n) {
+      var rank = ranked().findIndex(function (x) { return x.r === r; });
+      var num = el('span', { class: 'num', text: String(n + 1), 'aria-hidden': 'true' });
+      var text = el('input', { value: r.text, maxlength: 300, placeholder: 'It failed because…', 'aria-label': 'Reason ' + (n + 1), id: 'txt' + r.id });
+      text.addEventListener('input', function () { r.text = text.value; save(); renderDerived(); });
+      var del = el('button', { class: 'x', type: 'button', 'aria-label': 'Delete reason ' + (n + 1), text: '×', onclick: function () { state.risks.splice(n, 1); save(); renderAll(); } });
+      var sc = el('div', { class: 'score', text: String(score(r)), 'aria-label': 'Risk score ' + score(r) + ' of 25' }); sc.style.background = color(score(r));
+      var li = el('li', { class: 'risk' + (hl === r.id ? ' hl' : ''), id: 'risk' + r.id },
+        el('div', { class: 'top' }, num, text, del),
+        el('div', { class: 'two' },
+          el('div', null, el('label', { class: 'f', text: 'Likelihood' }), select('Likelihood of reason ' + (n + 1), r.l, function (v) { r.l = v; save(); renderAll(); }, LEVELS)),
+          el('div', null, el('label', { class: 'f', text: 'Impact' }), select('Impact of reason ' + (n + 1), r.i, function (v) { r.i = v; save(); renderAll(); }, IMPACT)),
+          sc),
+        (function () { var f = el('textarea', { placeholder: 'What would stop this? (the first small step)', 'aria-label': 'Mitigation for reason ' + (n + 1), maxlength: 300, rows: 2 }); f.value = r.fix; f.addEventListener('input', function () { r.fix = f.value; save(); renderFix(); }); return f; })());
+      ol.append(li);
+    });
+    if (focusId) { var f = $(focusId); if (f) f.focus(); }
+  }
+  function renderMatrix() {
+    var m = $('matrix'); m.replaceChildren();
+    for (var imp = 5; imp >= 1; imp--) {
+      m.append(el('div', { class: 'ax', text: imp === 5 ? 'Impact ↑ 5' : String(imp) }));
+      for (var lk = 1; lk <= 5; lk++) {
+        var cell = el('div', { class: 'mc' }); cell.style.background = color(lk * imp); cell.setAttribute('role', 'group'); cell.setAttribute('aria-label', 'Likelihood ' + lk + ', impact ' + imp);
+        state.risks.forEach(function (r, n) {
+          if (r.l === lk && r.i === imp && r.text.trim()) cell.append(el('button', { class: 'dot', type: 'button', text: String(n + 1), 'aria-label': 'Reason ' + (n + 1) + ': ' + r.text, onclick: function () { focusRisk(r); } }));
+        });
+        m.append(cell);
+      }
+    }
+    m.append(el('div', { class: 'ax' })); for (var l2 = 1; l2 <= 5; l2++) m.append(el('div', { class: 'ax', text: String(l2) }));
+  }
+  function focusRisk(r) { hl = r.id; renderRisks(); var t = $('txt' + r.id); if (t) { t.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); t.focus({ preventScroll: true }); } setTimeout(function () { hl = null; var li = $('risk' + r.id); if (li) li.classList.remove('hl'); }, 1600); }
+  function renderFix() {
+    var ol = $('fix'); ol.replaceChildren(); var top = ranked().slice(0, 3);
+    if (!top.length) ol.append(el('li', { class: 'empty', text: 'Add a few reasons and the three biggest will appear here.' }));
+    top.forEach(function (x) {
+      var r = x.r; ol.append(el('li', null, el('b', { text: (x.n + 1) + '. ' + r.text + '  (score ' + score(r) + ')' }), r.fix.trim() ? el('span', { class: 'm', text: 'Mitigation: ' + r.fix }) : el('span', { class: 'warn', text: 'No mitigation yet. What is the first small step?' })));
+    });
+    var all = ranked(), high = all.filter(function (x) { return score(x.r) >= 15; }).length, open = all.filter(function (x) { return !x.r.fix.trim(); }).length;
+    $('stats').textContent = all.length ? all.length + ' reasons · ' + high + ' high-risk (15+) · ' + open + ' without a mitigation' : '';
+  }
+  function renderDerived() { renderScene(); renderMatrix(); renderFix(); state.risks.forEach(function (r) { var li = $('risk' + r.id); if (li) { var sc = li.querySelector('.score'); sc.textContent = score(r); sc.style.background = color(score(r)); } }); }
+  function renderAll(focusId) { renderScene(); renderRisks(focusId); renderMatrix(); renderFix(); }
+
+  function addRisk(text) { if (state.risks.length >= 40) { say('That is plenty: 40 reasons is the limit.'); return; } var r = { id: nextId++, text: text || '', l: 3, i: 3, fix: '' }; state.risks.push(r); save(); renderAll('txt' + r.id); var t = $('txt' + r.id); if (t && text) t.setSelectionRange(text.length, text.length); }
+  function say(t) { $('msg').textContent = t; }
+  var chips = document.querySelector('.chips'); STARTERS.forEach(function (s) { chips.append(el('button', { class: 'chip', type: 'button', text: s, onclick: function () { addRisk(s.replace('…', ' ')); } })); });
+  $('add').addEventListener('click', function () { addRisk(''); });
+  $('proj').addEventListener('input', function () { state.project = this.value; save(); renderScene(); });
+  $('when').addEventListener('change', function () { state.when = this.value; save(); renderScene(); });
+  $('copy').addEventListener('click', function () {
+    var lines = ['# Premortem: ' + (state.project.trim() || 'Untitled'), '', '_Imagined failure ' + (state.when === 'a year from now' ? 'a year from now' : state.when.replace('in ', '') + ' from now') + '._', '', '| # | Reason | L | I | Score | Mitigation |', '| --- | --- | --- | --- | --- | --- |'];
+    ranked().forEach(function (x) { var r = x.r; lines.push('| ' + (x.n + 1) + ' | ' + r.text.replace(/\|/g, '\\|') + ' | ' + r.l + ' | ' + r.i + ' | ' + score(r) + ' | ' + (r.fix.replace(/\|/g, '\\|').replace(/\n/g, ' ') || '-') + ' |'); });
+    var text = lines.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { say('Copied. Sorted by score, highest first.'); }, function () { window.prompt('Copy this', text); });
+  });
+  $('print').addEventListener('click', function () { window.print(); });
+  $('reset').addEventListener('click', function () { if (!confirm('Delete this premortem and start over?')) return; state = { project: '', when: 'in 3 months', risks: [] }; $('proj').value = ''; $('when').value = state.when; save(); renderAll(); say('Cleared.'); });
+
+  load(); $('proj').value = state.project; if ([].some.call($('when').options, function (o) { return o.value === state.when; })) $('when').value = state.when;
+  renderAll();
+})();
+</script>
+</body>
+</html>

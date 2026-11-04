@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Queue</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Review Queue",
+  "description": "Log what you learn and get told what to review today. A small spaced-repetition scheduler: remember it and it comes back later, forget it and it comes back tomorrow.",
+  "created": "2026-11-04",
+  "tool": "Claude",
+  "kind": "app",
+  "thumbnail": "thumbnail.png",
+  "tags": ["learning", "memory", "productivity"],
+  "why": "Most of what gets read or watched is gone within weeks. Reviewing it at growing gaps is the cheapest way to keep it.",
+  "storage": "local",
+  "notes": "Intervals grow 1, 3, 7, 16, 35, 75 and 150 days; forgetting sends an item back to tomorrow. Items live in this browser only, so use Back up to move them. Add ?today=2026-12-01 to the address to see what would be due on another day."
+}
+</script>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f5fa; --card:#fff; --ink:#1d1b26; --muted:#645f78; --line:#dedbe9; --accent:#6d3fd8; --accent-ink:#fff; --field:#faf9fd; --ok:#17803d; --bad:#b4231b; --bar:#c9bdf0; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14121b; --card:#1d1a27; --ink:#efecf7; --muted:#a29cb8; --line:#332f43; --accent:#a98bff; --accent-ink:#17102b; --field:#171420; --ok:#4ade80; --bad:#ff8a80; --bar:#3d3364; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:18px 14px 56px; }
+  h1 { margin:0; font-size:1.5rem; } .lead { margin:2px 0 16px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
+  h2 { margin:0 0 10px; font-size:.82rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); display:flex; justify-content:space-between; gap:8px; }
+  input, textarea { width:100%; font:inherit; color:inherit; background:var(--field); border:1px solid var(--line); border-radius:10px; padding:9px 11px; min-height:40px; }
+  textarea { resize:vertical; min-height:64px; }
+  :focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  .b { min-height:40px; padding:0 14px; border:1px solid var(--line); background:var(--card); color:inherit; border-radius:10px; font:inherit; font-size:.92rem; cursor:pointer; }
+  .b:hover { border-color:var(--accent); } .b.p { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700; } .b.ok { border-color:var(--ok); color:var(--ok); font-weight:700; } .b.bad { border-color:var(--bad); color:var(--bad); font-weight:700; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  @media (max-width:560px) { .stats { grid-template-columns:repeat(2,1fr); } }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px; } .stat b { display:block; font-size:1.5rem; line-height:1.1; font-variant-numeric:tabular-nums; } .stat span { font-size:.78rem; color:var(--muted); }
+  .due { display:grid; gap:10px; }
+  .q { border:1px solid var(--line); border-radius:14px; padding:14px; background:var(--field); }
+  .q h3 { margin:0 0 4px; font-size:1.1rem; overflow-wrap:anywhere; } .q .a { margin:8px 0 0; padding:10px 12px; background:var(--card); border-left:3px solid var(--accent); border-radius:0 10px 10px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .q .meta { font-size:.8rem; color:var(--muted); }
+  .done { text-align:center; padding:22px 8px; color:var(--muted); } .done b { display:block; color:var(--ink); font-size:1.15rem; margin-bottom:2px; }
+  .chart { display:grid; grid-template-columns:repeat(14,1fr); gap:4px; align-items:end; height:110px; padding-top:6px; }
+  .col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:3px; font-size:.7rem; color:var(--muted); min-width:0; }
+  .col i { display:block; width:100%; background:var(--bar); border-radius:4px 4px 0 0; min-height:3px; } .col.today i { background:var(--accent); } .col span { font-variant-numeric:tabular-nums; }
+  .list { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .it { display:grid; grid-template-columns:1fr auto; gap:4px 10px; align-items:center; padding:9px 11px; border:1px solid var(--line); border-radius:12px; background:var(--field); }
+  .it .t { overflow-wrap:anywhere; font-weight:600; } .it .s { font-size:.78rem; color:var(--muted); grid-column:1; }
+  .pips { display:flex; gap:3px; } .pips u { width:9px; height:9px; border-radius:50%; background:var(--line); text-decoration:none; } .pips u.on { background:var(--accent); }
+  .x { border:0; background:none; color:var(--muted); width:34px; height:34px; border-radius:8px; font-size:1.1rem; cursor:pointer; } .x:hover { color:var(--bad); background:rgba(128,128,128,.12); }
+  .msg { min-height:1.3em; margin:8px 0 0; font-size:.85rem; color:var(--accent); } .msg.err { color:var(--bad); }
+  details summary { cursor:pointer; color:var(--muted); font-size:.9rem; } .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  textarea.mono { font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; min-height:90px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Review Queue</h1>
+  <p class="lead">Write down what you want to remember. It tells you when to look at it again.</p>
+
+  <div class="stats" aria-label="Summary">
+    <div class="stat"><b id="sDue">0</b><span>due <span id="sDay">today</span></span></div>
+    <div class="stat"><b id="sAll">0</b><span>items</span></div>
+    <div class="stat"><b id="sDone">0</b><span>mastered</span></div>
+    <div class="stat"><b id="sRate">–</b><span>remembered</span></div>
+  </div>
+
+  <section class="card" aria-labelledby="hDue"><h2 id="hDue">To review</h2><div class="due" id="due" aria-live="polite"></div></section>
+
+  <section class="card" aria-labelledby="hAdd"><h2 id="hAdd">Log something you learned</h2>
+    <form id="form">
+      <label class="sr" for="front">What to remember (a question or a title)</label>
+      <input id="front" maxlength="200" placeholder="What to remember, e.g. “Why does TCP need a three-way handshake?”" autocomplete="off" required>
+      <label class="sr" for="back">The answer or note (optional)</label>
+      <textarea id="back" maxlength="1000" placeholder="The answer or a note (optional). If you add one, it stays hidden until you press Show answer."></textarea>
+      <div class="row"><button class="b p" type="submit">Add to queue</button><span class="msg" id="addmsg" role="status" style="margin:0"></span></div>
+    </form></section>
+
+  <section class="card" aria-labelledby="hNext"><h2 id="hNext">Next 14 days</h2><div class="chart" id="chart" role="img" aria-label="Reviews due per day"></div></section>
+
+  <section class="card" aria-labelledby="hAll"><h2 id="hAll"><span>Everything in the queue</span></h2>
+    <label class="sr" for="filter">Filter items</label><input id="filter" type="search" placeholder="Filter…" autocomplete="off" style="margin-bottom:10px">
+    <ul class="list" id="list"></ul>
+    <details style="margin-top:14px"><summary>Back up or restore</summary>
+      <p class="lead" style="margin:8px 0">Your queue lives in this browser. Copy this text somewhere safe, or paste a backup below to restore it.</p>
+      <label class="sr" for="exp">Backup text</label><textarea class="mono" id="exp" readonly></textarea>
+      <div class="row"><button class="b" id="copy" type="button">Copy backup</button></div>
+      <label class="sr" for="imp">Paste a backup to restore</label><textarea class="mono" id="imp" placeholder="Paste a backup here" style="margin-top:10px"></textarea>
+      <div class="row"><button class="b" id="import" type="button">Restore from backup</button><button class="b bad" id="wipe" type="button" style="margin-left:auto">Delete everything</button></div>
+      <p class="msg" id="bmsg" role="status"></p></details>
+  </section>
+</div>
+<script>
+(function () {
+  var KEY = 'review-queue:v1', STEPS = [1, 3, 7, 16, 35, 75, 150], $ = function (id) { return document.getElementById(id); };
+  var data = { items: [], reviews: 0, remembered: 0 }, revealed = {};
+
+  /* ---------- dates: whole local days as YYYY-MM-DD strings, so there is no time-zone drift ---------- */
+  function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function parse(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return ymd(d); }
+  var q = /[?&]today=(\d{4}-\d{2}-\d{2})/.exec(location.search), TODAY = q && parse(q[1]) && ymd(parse(q[1])) === q[1] ? q[1] : ymd(new Date());
+  function diffDays(a, b) { return Math.round((parse(a) - parse(b)) / 864e5); }
+  function pretty(s) { var d = parse(s); return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+
+  /* ---------- storage ---------- */
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }
+  function sanitize(s) {
+    if (!s || !Array.isArray(s.items)) throw new Error('That is not a Review Queue backup.');
+    var items = s.items.slice(0, 2000).filter(function (i) { return i && typeof i.front === 'string' && i.front.trim() && parse(i.due) && parse(i.added); }).map(function (i) {
+      return { id: String(i.id || Math.random().toString(36).slice(2)), front: i.front.slice(0, 200), back: typeof i.back === 'string' ? i.back.slice(0, 1000) : '', added: i.added, due: i.due, step: Math.max(0, Math.min(STEPS.length, Math.round(+i.step) || 0)), n: Math.max(0, Math.round(+i.n) || 0) };
+    });
+    return { items: items, reviews: Math.max(0, Math.round(+s.reviews) || 0), remembered: Math.max(0, Math.round(+s.remembered) || 0) };
+  }
+  function load() { try { var s = localStorage.getItem(KEY); if (s) data = sanitize(JSON.parse(s)); } catch (e) {} }
+
+  /* ---------- the schedule ---------- */
+  function review(item, ok) {
+    data.reviews++; item.n++;
+    if (ok) { data.remembered++; item.step = Math.min(item.step + 1, STEPS.length); }
+    else item.step = 0;
+    item.due = item.step >= STEPS.length ? addDays(TODAY, 365 * 10) : addDays(TODAY, STEPS[item.step]);   // mastered items are parked far away
+    delete revealed[item.id]; save(); render(item.id);
+  }
+  function mastered(i) { return i.step >= STEPS.length; }
+  function dueItems() { return data.items.filter(function (i) { return !mastered(i) && i.due <= TODAY; }).sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : a.added < b.added ? -1 : 1; }); }
+
+  /* ---------- rendering ---------- */
+  function el(tag, props) { var e = document.createElement(tag); Object.keys(props || {}).forEach(function (k) { if (k === 'text') e.textContent = props[k]; else if (k === 'class') e.className = props[k]; else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), props[k]); else e.setAttribute(k, props[k]); }); for (var i = 2; i < arguments.length; i++) if (arguments[i]) e.append(arguments[i]); return e; }
+  function render(focusId) {
+    var due = dueItems(), el1 = $('due'); el1.replaceChildren();
+    $('sDay').textContent = TODAY === ymd(new Date()) ? 'today' : 'on ' + pretty(TODAY);
+    if (!due.length) el1.append(el('div', { class: 'done' }, el('b', { text: data.items.length ? 'Nothing to review.' : 'Your queue is empty.' }), document.createTextNode(data.items.length ? 'Come back tomorrow, or add something new below.' : 'Log something you learned and it will show up here when it is time.')));
+    due.slice(0, 30).forEach(function (it, i) {
+      var shown = !it.back || revealed[it.id], late = diffDays(TODAY, it.due);
+      var card = el('div', { class: 'q' }, el('div', { class: 'meta', text: (i + 1) + ' of ' + due.length + (late > 0 ? ' · ' + late + (late === 1 ? ' day' : ' days') + ' overdue' : '') + ' · review ' + (it.n + 1) }), el('h3', { text: it.front }));
+      if (it.back && shown) card.append(el('p', { class: 'a', text: it.back }));
+      var row = el('div', { class: 'row' });
+      if (!shown) row.append(el('button', { class: 'b p', type: 'button', id: 'show' + it.id, text: 'Show answer', onclick: function () { revealed[it.id] = true; render('ok' + it.id); } }));
+      else row.append(el('button', { class: 'b ok', type: 'button', id: 'ok' + it.id, text: 'Remembered', onclick: function () { review(it, true); } }), el('button', { class: 'b bad', type: 'button', text: 'Forgot', onclick: function () { review(it, false); } }));
+      card.append(row); el1.append(card);
+    });
+    if (due.length > 30) el1.append(el('p', { class: 'meta', text: '+ ' + (due.length - 30) + ' more waiting. Clear these first.' }));
+
+    $('sDue').textContent = due.length; $('sAll').textContent = data.items.length; $('sDone').textContent = data.items.filter(mastered).length;
+    $('sRate').textContent = data.reviews ? Math.round(data.remembered / data.reviews * 100) + '%' : '–';
+    chart(); list(); $('exp').value = JSON.stringify(data);
+    if (focusId) { var f = $(focusId) || $('show' + focusId) || $('ok' + focusId); if (f) f.focus(); else { var nx = document.querySelector('#due .b'); if (nx && due.length) nx.focus({ preventScroll: true }); } }
+  }
+  function chart() {
+    var c = $('chart'); c.replaceChildren(); var counts = [], max = 1, total = 0;
+    for (var d = 0; d < 14; d++) { var day = addDays(TODAY, d), n = data.items.filter(function (i) { return !mastered(i) && (d === 0 ? i.due <= day : i.due === day); }).length; counts.push(n); max = Math.max(max, n); total += n; }
+    counts.forEach(function (n, d) {
+      var day = addDays(TODAY, d), col = el('div', { class: 'col' + (d === 0 ? ' today' : ''), title: pretty(day) + ': ' + n }), bar = el('i'); bar.style.height = (n / max * 72) + 'px';
+      col.append(el('span', { text: n ? String(n) : '' }), bar, el('span', { text: parse(day).toLocaleDateString(undefined, { weekday: 'narrow' }) })); c.append(col);
+    });
+    c.setAttribute('aria-label', 'Reviews due over the next 14 days: ' + counts.join(', ') + ' (' + total + ' in total)');
+  }
+  function list() {
+    var ul = $('list'), f = $('filter').value.trim().toLowerCase(); ul.replaceChildren();
+    var items = data.items.slice().sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; }).filter(function (i) { return !f || (i.front + ' ' + i.back).toLowerCase().indexOf(f) !== -1; });
+    if (!items.length) ul.append(el('li', { class: 'meta', text: data.items.length ? 'No match.' : 'Nothing logged yet.' }));
+    items.slice(0, 200).forEach(function (i) {
+      var pips = el('span', { class: 'pips', 'aria-hidden': 'true' }); STEPS.forEach(function (_, k) { pips.append(el('u', { class: i.step > k ? 'on' : '' })); });
+      var status = mastered(i) ? 'Mastered' : i.due <= TODAY ? 'Due now' : 'Next ' + pretty(i.due) + ' (in ' + diffDays(i.due, TODAY) + ' d)';
+      ul.append(el('li', { class: 'it' }, el('span', { class: 't', text: i.front }), el('button', { class: 'x', type: 'button', 'aria-label': 'Delete: ' + i.front, text: '×', onclick: function () { data.items = data.items.filter(function (x) { return x !== i; }); save(); render(); } }), el('span', { class: 's' }, document.createTextNode(status + ' · ' + i.n + ' reviews  '), pips)));
+    });
+  }
+
+  /* ---------- forms ---------- */
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault(); var front = $('front').value.trim(); if (!front) return;
+    if (data.items.length >= 2000) { $('addmsg').textContent = 'The queue is full (2000 items).'; return; }
+    data.items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), front: front, back: $('back').value.trim(), added: TODAY, due: addDays(TODAY, 1), step: 0, n: 0 });
+    $('front').value = ''; $('back').value = ''; save(); render(); $('addmsg').textContent = 'Added. First review tomorrow.'; $('front').focus();
+  });
+  $('filter').addEventListener('input', list);
+  function bsay(t, bad) { $('bmsg').textContent = t; $('bmsg').className = 'msg' + (bad ? ' err' : ''); }
+  $('copy').addEventListener('click', function () { var t = $('exp').value; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { bsay('Backup copied.'); }, function () { $('exp').select(); bsay('Select the text and copy it.', true); }); });
+  $('import').addEventListener('click', function () {
+    try { var s = $('imp').value.trim(); if (!s) throw new Error('Paste a backup first.'); var d = sanitize(JSON.parse(s)); if (!d.items.length) throw new Error('That backup has no items.'); data = d; save(); $('imp').value = ''; render(); bsay('Restored ' + d.items.length + ' items.'); }
+    catch (e) { bsay(e instanceof SyntaxError ? 'That text is not valid JSON.' : e.message, true); }
+  });
+  $('wipe').addEventListener('click', function () { if (!data.items.length || !confirm('Delete all ' + data.items.length + ' items? This cannot be undone.')) return; data = { items: [], reviews: 0, remembered: 0 }; save(); render(); bsay('Everything deleted.'); });
+
+  load(); render();
+})();
+</script>
+</body>
+</html>

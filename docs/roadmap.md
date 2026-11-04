@@ -17,6 +17,7 @@ The short version is in the README. This file tracks detail.
 - [x] Artifacts served at 4-character addresses (no redirect), "Spec + prompt" button, "artifact" wording, URL shortener sample removed
 
 - [x] Adding artifacts: `shelf add --clipboard`, `-` for stdin, opt-in `--commit`/`--push`, and the inbox (`shelf ingest` + `ingest.yml`)
+- [x] Six more artifacts: Holocron (Star Wars watch order), Decision Wheel, JSON Explorer, 168 Hours, Premortem, Review Queue, each with end-to-end tests
 
 ## Next
 

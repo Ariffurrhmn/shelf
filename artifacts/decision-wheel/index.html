@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Wheel</title>
+<script type="application/json" id="shelf-meta">
+{
+  "title": "Decision Wheel",
+  "description": "Can't decide? List your options, give some more weight, and spin. The winner is picked fairly first; the wheel then lands on it.",
+  "created": "2026-11-04",
+  "tool": "Claude",
+  "kind": "app",
+  "tags": ["decisions", "random", "utility"],
+  "storage": "local",
+  "notes": "Add a weight to a line with x, for example \"Pizza x3\". Options and settings are kept in this browser only. \"Copy link\" puts the options in the address so you can send the same wheel to someone."
+}
+</script>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f5f1; --card:#ffffff; --ink:#1b1b19; --muted:#63635d; --line:#dcdad2; --accent:#d9480f; --accent-ink:#fff; --field:#fbfaf7; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151514; --card:#1f1f1d; --ink:#f1efe8; --muted:#a3a299; --line:#34342f; --accent:#ff8a4c; --accent-ink:#1a0e05; --field:#171716; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:960px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:1.5rem; letter-spacing:-.01em; }
+  .lead { margin:0 0 20px; color:var(--muted); }
+  .grid { display:grid; gap:20px; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); align-items:start; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .stage { position:relative; width:min(100%,460px); margin:0 auto; aspect-ratio:1; }
+  canvas { width:100%; height:100%; display:block; }
+  .pointer { position:absolute; left:50%; top:-6px; transform:translateX(-50%); width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-top:26px solid var(--ink); filter:drop-shadow(0 2px 2px rgba(0,0,0,.3)); z-index:2; }
+  .hub { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:26%; aspect-ratio:1; border-radius:50%; border:4px solid var(--card); background:var(--accent); color:var(--accent-ink); font-weight:800; font-size:clamp(.8rem,3.4vw,1.15rem); letter-spacing:.04em; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.28); z-index:2; }
+  .hub:disabled { cursor:progress; opacity:.85; }
+  :focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+  .result { text-align:center; min-height:4.4rem; margin-top:14px; }
+  .result small { display:block; color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.12em; }
+  .result b { display:block; font-size:clamp(1.4rem,5vw,2rem); line-height:1.2; overflow-wrap:anywhere; }
+  label.t { display:block; font-weight:600; margin-bottom:6px; }
+  textarea { width:100%; min-height:210px; resize:vertical; background:var(--field); color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px; font:inherit; line-height:1.5; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+  button.b, label.chk { min-height:40px; padding:0 14px; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; font:inherit; font-size:.92rem; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  button.b:hover { background:rgba(128,128,128,.12); }
+  .hint { color:var(--muted); font-size:.85rem; margin:8px 0 0; }
+  .hist { margin:0; padding:0; list-style:none; display:grid; gap:4px; max-height:200px; overflow:auto; }
+  .hist li { display:flex; justify-content:space-between; gap:10px; padding:6px 10px; border-radius:8px; background:var(--field); font-size:.92rem; }
+  .hist li span:last-child { color:var(--muted); font-variant-numeric:tabular-nums; }
+  h2 { margin:18px 0 8px; font-size:1rem; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Decision Wheel</h1>
+  <p class="lead">One option per line. Add <code>x3</code> to a line to make it three times as likely.</p>
+  <div class="grid">
+    <section class="card" aria-label="Wheel">
+      <div class="stage">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel" width="920" height="920" role="img" aria-label="Wheel of options"></canvas>
+        <button class="hub" id="spin" type="button" aria-label="Spin the wheel">SPIN</button>
+      </div>
+      <div class="result" aria-live="polite" aria-atomic="true"><small id="rlabel"></small><b id="rtext">Press spin</b></div>
+    </section>
+
+    <section class="card" aria-label="Options">
+      <label class="t" for="opts">Options <span id="count" class="hint" style="font-weight:400"></span></label>
+      <textarea id="opts" spellcheck="false" autocomplete="off"></textarea>
+      <p class="hint" id="warn" role="status"></p>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="remove"> Remove winner after each spin</label>
+        <label class="chk"><input type="checkbox" id="tick"> Tick sound</label>
+      </div>
+      <div class="row">
+        <button class="b" type="button" id="shuffle">Shuffle order</button>
+        <button class="b" type="button" id="link">Copy link</button>
+        <button class="b" type="button" data-preset="yesno">Yes / No</button>
+        <button class="b" type="button" data-preset="die">Die (1–6)</button>
+        <button class="b" type="button" data-preset="meal">What to eat</button>
+      </div>
+      <p class="hint" id="note" role="status"></p>
+      <h2>History</h2>
+      <ol class="hist" id="hist" aria-label="Previous results"></ol>
+      <div class="row"><button class="b" type="button" id="clearhist">Clear history</button></div>
+    </section>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'decision-wheel:v1', MAX = 60, TAU = Math.PI * 2;
+  var $ = function (id) { return document.getElementById(id); };
+  var cv = $('wheel'), cx = cv.getContext('2d'), opts = $('opts');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var PRESETS = {
+    yesno: 'Yes\nNo',
+    die: '1\n2\n3\n4\n5\n6',
+    meal: 'Pizza\nTacos\nRamen\nSalad\nCurry\nBurgers'
+  };
+  var rot = 0, spinning = false, history = [], audio;
+
+  /* ---------- parsing: "Name x3" => weight 3 ---------- */
+  function parse(text) {
+    return text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).slice(0, MAX).map(function (l) {
+      var m = /^(.*\S)\s+x\s?(\d{1,3})$/i.exec(l), w = m ? Math.max(1, parseInt(m[2], 10)) : 1;
+      return { label: m ? m[1] : l, weight: w };
+    });
+  }
+  function segments(list) {
+    var total = list.reduce(function (s, o) { return s + o.weight; }, 0), a = 0;
+    return list.map(function (o) { var span = o.weight / total * TAU, seg = { label: o.label, weight: o.weight, from: a, to: a + span }; a += span; return seg; });
+  }
+
+  /* ---------- fair random: the pick comes from crypto, the animation only lands on it ---------- */
+  function rand() {
+    if (window.crypto && crypto.getRandomValues) { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; }
+    return Math.random();
+  }
+  function pick(segs) {
+    var total = segs.reduce(function (s, g) { return s + g.weight; }, 0), r = rand() * total, acc = 0;
+    for (var i = 0; i < segs.length; i++) { acc += segs[i].weight; if (r < acc) return i; }
+    return segs.length - 1;
+  }
+  function under(segs, r) { // which segment is under the pointer (top) at rotation r
+    var a = (((-Math.PI / 2 - r) % TAU) + TAU) % TAU;
+    for (var i = 0; i < segs.length; i++) if (a >= segs[i].from && a < segs[i].to) return i;
+    return segs.length - 1;
+  }
+
+  /* ---------- drawing ---------- */
+  function hue(i, n) { return Math.round((i * 360 / Math.max(n, 1) + 18) % 360); }
+  function draw(segs, hi) {
+    var s = cv.width, c = s / 2, R = c - 6;
+    cx.clearRect(0, 0, s, s);
+    if (!segs.length) { cx.fillStyle = 'rgba(128,128,128,.25)'; cx.beginPath(); cx.arc(c, c, R, 0, TAU); cx.fill(); return; }
+    cx.save(); cx.translate(c, c); cx.rotate(rot);
+    segs.forEach(function (g, i) {
+      cx.beginPath(); cx.moveTo(0, 0); cx.arc(0, 0, R, g.from, g.to); cx.closePath();
+      cx.fillStyle = 'hsl(' + hue(i, segs.length) + ' 78% ' + (hi === i ? '72%' : '62%') + ')'; cx.fill();
+      cx.lineWidth = hi === i ? 8 : 3; cx.strokeStyle = hi === i ? '#111' : 'rgba(255,255,255,.85)'; cx.stroke();
+      var mid = (g.from + g.to) / 2, span = g.to - g.from;
+      cx.save(); cx.rotate(mid); cx.textAlign = 'right'; cx.textBaseline = 'middle'; cx.fillStyle = '#17171a';
+      var fs = Math.max(20, Math.min(46, R * span * 0.5, R * 0.14)); cx.font = '700 ' + fs + 'px system-ui,sans-serif';
+      var t = g.label, maxw = R * 0.62; while (cx.measureText(t).width > maxw && t.length > 2) t = t.slice(0, -2) + '…';
+      cx.fillText(t, R - 24, 0); cx.restore();
+    });
+    cx.restore();
+  }
+
+  /* ---------- state ---------- */
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ text: opts.value, remove: $('remove').checked, tick: $('tick').checked, history: history.slice(0, 30) })); } catch (e) {} }
+  function refresh() {
+    var list = parse(opts.value), segs = segments(list);
+    $('count').textContent = '(' + list.length + (list.length === 1 ? ' option' : ' options') + ')';
+    var n = opts.value.split('\n').filter(function (l) { return l.trim(); }).length;
+    $('warn').textContent = n > MAX ? 'Only the first ' + MAX + ' options are used.' : (list.length < 2 ? 'Add at least two options to spin.' : '');
+    $('spin').disabled = spinning || list.length < 2;
+    cv.setAttribute('aria-label', 'Wheel with ' + list.length + ' options: ' + list.map(function (o) { return o.label; }).join(', '));
+    draw(segs, -1); return segs;
+  }
+  function renderHist() {
+    var ol = $('hist'); ol.replaceChildren();
+    if (!history.length) { var li = document.createElement('li'); li.textContent = 'Nothing yet.'; ol.append(li); return; }
+    history.slice(0, 12).forEach(function (h, i) {
+      var li = document.createElement('li'), a = document.createElement('span'), b = document.createElement('span');
+      a.textContent = h.label; b.textContent = '#' + (history.length - i); li.append(a, b); ol.append(li);
+    });
+  }
+  function tick() {
+    if (!$('tick').checked) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      var t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 900; g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + 0.05);
+    } catch (e) {}
+  }
+
+  /* ---------- spin ---------- */
+  function spin() {
+    if (spinning) return;
+    var segs = refresh(); if (segs.length < 2) return;
+    var w = pick(segs), g = segs[w], a = g.from + (g.to - g.from) * (0.12 + rand() * 0.76);   // a point well inside the winning wedge
+    var target = -Math.PI / 2 - a, delta = (((target - rot) % TAU) + TAU) % TAU + TAU * (5 + Math.floor(rand() * 3));
+    var from = rot, dur = reduce ? 0 : 4300 + rand() * 900, t0 = null, lastIdx = under(segs, rot);
+    cv.dataset.picked = g.label;   // what the random draw chose; the wheel must stop on exactly this
+    spinning = true; $('spin').disabled = true; $('rtext').textContent = reduce ? '' : '…'; $('rlabel').textContent = '';
+    function done() {
+      rot = from + delta; spinning = false;
+      var idx = under(segs, rot), label = segs[idx].label;      // read the result back from where the wheel actually stopped
+      draw(segs, idx); cv.dataset.winner = label;
+      $('rlabel').textContent = 'Winner'; $('rtext').textContent = label;
+      history.unshift({ label: label }); renderHist();
+      if ($('remove').checked) {
+        var lines = opts.value.split('\n'), seen = 0, keep = [], removeAt = idx;
+        lines.forEach(function (l) { if (l.trim() && seen++ === removeAt) return; keep.push(l); });
+        opts.value = keep.join('\n'); $('note').textContent = '“' + label + '” was removed from the wheel.'; rot = 0;
+      } else $('note').textContent = '';
+      refresh(); save();
+    }
+    if (!dur) { done(); return; }
+    (function frame(ts) {
+      if (t0 === null) t0 = ts; var p = Math.min((ts - t0) / dur, 1), e = 1 - Math.pow(1 - p, 4);
+      rot = from + delta * e; var u = under(segs, rot); if (u !== lastIdx) { lastIdx = u; tick(); }
+      draw(segs, -1);
+      if (p < 1) requestAnimationFrame(frame); else done();
+    })(performance.now());
+  }
+
+  /* ---------- controls ---------- */
+  $('spin').addEventListener('click', spin);
+  opts.addEventListener('input', function () { rot = 0; refresh(); save(); });
+  $('remove').addEventListener('change', save); $('tick').addEventListener('change', save);
+  $('shuffle').addEventListener('click', function () {
+    var l = opts.value.split('\n').filter(function (x) { return x.trim(); });
+    for (var i = l.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = l[i]; l[i] = l[j]; l[j] = t; }
+    opts.value = l.join('\n'); rot = 0; refresh(); save();
+  });
+  document.querySelectorAll('[data-preset]').forEach(function (b) { b.addEventListener('click', function () { opts.value = PRESETS[b.dataset.preset]; rot = 0; $('rtext').textContent = 'Press spin'; $('rlabel').textContent = ''; refresh(); save(); }); });
+  $('clearhist').addEventListener('click', function () { history = []; renderHist(); save(); });
+  function enc(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function dec(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+  $('link').addEventListener('click', function () {
+    var url = location.href.split('#')[0] + '#wheel=' + enc(opts.value);
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
+      function () { $('note').textContent = 'Link copied. Anyone who opens it gets this wheel.'; },
+      function () { window.prompt('Copy this link', url); });
+  });
+
+  /* ---------- start ---------- */
+  var saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  opts.value = saved && typeof saved.text === 'string' ? saved.text : PRESETS.meal;
+  if (saved) { $('remove').checked = !!saved.remove; $('tick').checked = !!saved.tick; if (Array.isArray(saved.history)) history = saved.history.filter(function (h) { return h && typeof h.label === 'string'; }); }
+  var m = /^#wheel=([\w-]+)$/.exec(location.hash);
+  if (m) { try { opts.value = dec(m[1]).slice(0, 4000); $('note').textContent = 'Loaded the wheel from the link.'; } catch (e) {} }
+  renderHist(); refresh();
+})();
+</script>
+</body>
+</html>

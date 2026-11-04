@@ -4,7 +4,20 @@ The gallery is only as good as what is on it. This page is about curating it hon
 
 ## Current state
 
-The repository ships three published sample artifacts (`pomodoro-timer`, `snake-game`, `shelf-intro-slides`) and one draft (`wip-example`). The `url-shortener` sample was removed at the owner's request; its addresses are listed in `retired.json`. They are labelled as samples in their tags and notes. Shelf 2.0 did **not** add, remove or re-describe any of them, and nothing is marked `featured`: those choices (and any claim about how they were made) are yours.
+Three samples (`pomodoro-timer`, `snake-game`, `shelf-intro-slides`) and one draft (`wip-example`) came with the repository; they are labelled as samples in their tags and notes. The `url-shortener` sample was removed at the owner's request; its addresses are listed in `retired.json`.
+
+Six artifacts were added on request, all made with Claude:
+
+| Artifact | Where it came from | What it is |
+| --- | --- | --- |
+| `star-wars-watch-order` (Holocron) | Remade from the owner's own Holocron 8.0 file; its data (watch list, 135-fragment Clone Wars log, archive, extras) is kept as supplied | Chronological Star Wars tracker with episode checklists, an "up next" card and a sealed archive of what is already watched |
+| `decision-wheel` | Requested by name | A weighted spin wheel; the pick is random first, the animation lands on it |
+| `json-explorer` | Requested by name | Lazy tree viewer with search, path jump and exact error locations; saves nothing |
+| `168-hours` | Original idea | Paint a week of 168 hourly squares, with weekly targets |
+| `premortem` | Original idea | Imagine the project failed, list why, rank by likelihood x impact |
+| `review-queue` | Original idea | A small spaced-repetition scheduler (1, 3, 7, 16, 35, 75, 150 day gaps) |
+
+Nothing is marked `featured`: that choice, and any claim about how things were made, is the owner's. Three covers (`168-hours`, `premortem`, `review-queue`) are screenshots of the real tool filled with *example* data (`thumbnail.png` in each folder), because those tools start empty.
 
 ## Recommendations (nothing here is done for you)
 
