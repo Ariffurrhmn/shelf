@@ -17,13 +17,13 @@ Every artifact carries a JSON block in its HTML `<head>` with the id `shelf-meta
 | `short` | string | no | automatic | Your own short-link code, for example `kafka` gives `<site>/kafka`. 2 to 32 characters: lowercase letters, digits and single hyphens, starting and ending with a letter or digit. `artifacts`, `assets`, `thumbnails`, `index` and `404` are reserved. Without it Shelf assigns a stable 4-character code. See [Short links](#short-links). |
 | `install` | boolean | no | `false` | If `true`, the build makes the artifact installable as a PWA that works offline, see SPEC section 10. |
 | `color` | string | no | from slug | Hex colour such as `#d64933`: theme colour and icon background of the installed app. Only used with `install`. |
-| `featured` | boolean | no | `false` | Shows the project in the gallery's Featured strip. Nothing is featured unless you set this. |
+| `featured` | boolean | no | `false` | Shows the artifact in the gallery's Featured strip. Nothing is featured unless you set this. |
 | `status` | string | no | | `experiment` or `finished`. Shown on cards when set. |
 | `why` | string | no | | Why it was made, 400 characters at most. Shown in the details view. |
 | `updated` | string | no | | Date of the last meaningful change as `YYYY-MM-DD`; not before `created`. |
 | `source` | string | no | | `http(s)` link to the conversation or repository it came from. |
 | `thumbnail` | string | no | screenshot | A plain file name in the artifact folder (`.png`, `.jpg`, `.jpeg`, `.webp`, 2 MB at most) used instead of the automatic screenshot. It is resized to the same 8:5 format. |
-| `aliases` | list of strings | no | `[]` | Earlier slugs. `artifacts/<old>/` keeps redirecting to this artifact. `shelf rename` maintains it. |
+| `aliases` | list of strings | no | `[]` | Earlier slugs. `artifacts/<old>/` keeps redirecting to this artifact's short address. `shelf rename` maintains it. |
 
 ## Example
 
@@ -62,7 +62,7 @@ Only the five required fields matter for an artifact to be accepted; every other
 
 ## Short links
 
-Every published artifact gets a short link, `https://<site>/<code>`, that redirects to it.
+Every published artifact is served at a short address, `https://<site>/<code>`. The address bar stays short because the artifact itself lives there (it is not a redirect); the long address `artifacts/<slug>/` redirects to it. Add `#3` to link to a slide or section.
 
 - **Automatic code:** 4 characters taken from a hash of the slug, using letters and digits without look-alikes (no `i`, `l`, `o`, `0`, `1`). The same slug always gives the same code, with no stored state. Renaming the slug changes the code.
 - **Your own code:** set `short` in the metadata when you want something you can say aloud, such as `kafka`. It then stays whatever the slug does.
@@ -70,4 +70,4 @@ Every published artifact gets a short link, `https://<site>/<code>`, that redire
 - **Drafts** get no short link.
 - **Any other address:** `links.json` at the repository root maps a code to an `http://` or `https://` URL, for example `{"repo": "https://github.com/ariffurrhmn/shelf"}`. Those links are published the same way.
 
-Print the link before you publish with `python tools/build/shortlinks.py <slug>`.
+Print the link before you publish with `python shelf links`.

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Short links for Shelf.
 
-Shelf is static hosting, so a short link cannot be a server redirect. Instead
-the build writes one tiny redirect page per code:
+Shelf is static hosting, so there are no server redirects. A short link is a folder:
 
-    site/<code>/index.html   ->   artifacts/<slug>/   (or any https URL)
+    site/<code>/index.html   ->   the artifact itself (no redirect, so the address stays short),
+                                  or, for links.json entries, a tiny redirect page to any https URL
 
 so https://<host>/<code> opens the artifact. Two kinds of code exist:
 
-  * artifact codes: every published artifact gets one automatically. It is a
-    4-character code derived from the slug (the same slug always gives the same
-    code), or the artifact's own `"short"` metadata field when it sets one.
+  * artifact codes: every published artifact gets one automatically and is served at /<code>/.
+    It is a 4-character code derived from the slug (the same slug always gives the same
+    code), or the artifact's own `"short"` metadata field when it sets one. The long
+    address artifacts/<slug>/ stays alive as a redirect to it.
   * extra links: `links.json` at the repository root maps `"code": "https://..."`
     for any other address, which makes Shelf a general URL shortener.
 
@@ -183,25 +184,20 @@ def redirect_page(target: str, label: str, *, forward: bool, share: str = "") ->
     )
 
 
-def write_redirects(out: Path, plan: Plan, share: dict[str, str] | None = None) -> int:
-    """Write site/<code>/index.html for every code. Returns how many.
+def write_redirects(out: Path, plan: Plan) -> int:
+    """Write site/<code>/index.html for every extra link in links.json. Returns how many.
 
-    `share` maps a slug to ready-made Open Graph markup for its redirect page."""
-    share = share or {}
-    # `artifacts`, `assets` and friends are reserved by the validator, but the
-    # gallery build may emit other top-level names too; never overwrite them.
+    Artifact codes are not redirects: the artifact itself is served at /<code>/ (see build.py)."""
     problems = [
         f"Short code {code!r} would overwrite {out / code}; choose a different code."
-        for code in plan.codes()
+        for code in plan.external
         if (out / code).exists()
     ]
     if problems:
         raise ShortLinkError(problems)
-    for slug, code in plan.artifacts.items():
-        _write(out / code, redirect_page(f"../artifacts/{slug}/", slug, forward=True, share=share.get(slug, "")))
     for code, url in plan.external.items():
         _write(out / code, redirect_page(url, urlparse(url).netloc, forward=False))
-    return len(plan.codes())
+    return len(plan.external)
 
 
 def _write(folder: Path, text: str) -> None:
@@ -209,21 +205,22 @@ def _write(folder: Path, text: str) -> None:
     (folder / "index.html").write_text(text, encoding="utf-8")
 
 
-def write_alias_redirects(out: Path, aliases: dict[str, str]) -> int:
-    """Keep old artifact addresses alive: site/artifacts/<old>/ -> ../<new>/.
+def write_alias_redirects(out: Path, targets: dict[str, str]) -> int:
+    """Keep every older address alive: site/artifacts/<name>/ -> ../../<code>/.
 
-    `aliases` maps an old slug to the artifact's current slug. Query string and
-    hash are forwarded, so an old link to a slide still opens that slide."""
+    `targets` maps a name (the artifact's slug, or an old slug from `aliases`) to the short code the
+    artifact is now served at. Query string and hash are forwarded, so an old link to a slide still
+    opens that slide."""
     problems = [
-        f"Alias {old!r} (of {new!r}) would overwrite {out / 'artifacts' / old}; remove the alias or rename the artifact."
-        for old, new in sorted(aliases.items())
-        if (out / "artifacts" / old).exists()
+        f"Address artifacts/{name}/ ({code!r}) would overwrite {out / 'artifacts' / name}; remove the alias or rename the artifact."
+        for name, code in sorted(targets.items())
+        if (out / "artifacts" / name).exists()
     ]
     if problems:
         raise ShortLinkError(problems)
-    for old, new in aliases.items():
-        _write(out / "artifacts" / old, redirect_page(f"../{new}/", new, forward=True))
-    return len(aliases)
+    for name, code in targets.items():
+        _write(out / "artifacts" / name, redirect_page(f"../../{code}/", code, forward=True))
+    return len(targets)
 
 
 def base_url(env: dict[str, str] | None = None) -> str | None:

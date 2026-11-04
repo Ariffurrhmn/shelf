@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Download, Search, SlidersHorizontal, X } from "lucide-react"
 import { useMemo, useState } from "react"
 
-import { ProjectCard } from "@/components/project-card"
+import { ArtifactCard } from "@/components/artifact-card"
 import { cx } from "@/lib/cx"
 import { SORT_OPTIONS, hasActiveFilters, kindCounts, tagCounts } from "@/lib/filter"
 import { plural } from "@/lib/format"
@@ -15,7 +15,7 @@ interface Props {
   all: Artifact[]
   /** What matches right now (after filters and sort), shown in the grid. */
   results: Artifact[]
-  /** Featured projects shown above, so the grid is "the rest". */
+  /** Featured artifacts shown above, so the grid is "the rest". */
   hiddenFeatured: number
   filters: Filters
   sort: SortKey
@@ -43,10 +43,10 @@ export function Explore(p: Props) {
   const selectedHidden = filters.tags.filter((t) => !shownTags.some((x) => x.tag === t))
 
   const countText = filtering
-    ? `${results.length} of ${plural(all.length, "project")} match`
+    ? `${results.length} of ${plural(all.length, "artifact")} match`
     : p.hiddenFeatured > 0
-      ? `${plural(results.length, "more project")}, plus ${p.hiddenFeatured} featured above`
-      : plural(results.length, "project")
+      ? `${plural(results.length, "more artifact")}, plus ${p.hiddenFeatured} featured above`
+      : plural(results.length, "artifact")
 
   return (
     <section id="explore" tabIndex={-1} aria-labelledby="explore-title" className="wrap scroll-mt-16 pb-16 outline-none">
@@ -76,7 +76,7 @@ export function Explore(p: Props) {
                   }
                 }}
                 placeholder="Search by title, tag, tool…"
-                aria-label="Search projects"
+                aria-label="Search artifacts"
                 autoComplete="off"
                 spellCheck={false}
                 enterKeyHint="search"
@@ -173,14 +173,14 @@ export function Explore(p: Props) {
           title="The shelf is empty"
           body={
             <>
-              Add your first project: <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-sm">./shelf add my-app.html</code>, then push.
+              Add your first artifact: <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-sm">./shelf add my-app.html</code>, then push.
             </>
           }
         />
       ) : results.length === 0 && p.hiddenFeatured === 0 ? (
         <Empty
           title="Nothing matches"
-          body={filters.query.trim() ? <>No project matches “{filters.query.trim()}” with these filters.</> : <>No project matches this combination of filters.</>}
+          body={filters.query.trim() ? <>No artifact matches “{filters.query.trim()}” with these filters.</> : <>No artifact matches this combination of filters.</>}
           action={
             <button type="button" className="btn btn-secondary" onClick={p.onClear}>
               <X aria-hidden /> Clear all filters
@@ -188,10 +188,10 @@ export function Explore(p: Props) {
           }
         />
       ) : results.length > 0 ? (
-        <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
+        <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Artifacts">
           {results.map((a, i) => (
             <li key={a.slug}>
-              <ProjectCard artifact={a} onDetails={p.onDetails} eager={i < 3 && p.hiddenFeatured === 0} />
+              <ArtifactCard artifact={a} onDetails={p.onDetails} eager={i < 3 && p.hiddenFeatured === 0} />
             </li>
           ))}
         </ul>

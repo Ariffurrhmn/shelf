@@ -6,10 +6,10 @@ Create in Claude / ChatGPT → save the HTML → shelf add → preview → git p
 
 ## 1. Ask the AI for a Shelf-ready file
 
-Print the instructions and paste them at the start of the conversation (or into the assistant's project/custom instructions so every new artifact follows them):
+Press **Spec + prompt** on the site (header or hero): it copies the prompt, the full spec and the metadata reference in one go. The same text is `python shelf prompt --full`; `python shelf prompt` prints just the short prompt. Paste it at the start of the conversation (or into the assistant's project/custom instructions so every new artifact follows them):
 
 ```bash
-python shelf prompt          # prints spec/PROMPT.md's block; pipe it to your clipboard tool
+python shelf prompt --full   # same text as the button; pipe it to your clipboard tool
 ```
 
 Then describe what you want. The assistant asks for anything it does not know (date, tool), writes one `index.html` with the metadata block, declares storage and network honestly, and finishes with a self-check list.
@@ -17,6 +17,24 @@ Then describe what you want. The assistant asks for anything it does not know (d
 You can also skip the metadata block: `shelf add` will ask you for it.
 
 ## 2. Add it
+
+Pick the route that fits where you are.
+
+### From the clipboard (computer)
+
+Click Copy on the code block in the chat, then:
+
+```bash
+python shelf add --clipboard
+```
+
+You can copy the whole reply: only the HTML document is kept (Markdown fences and the AI's commentary, including its checklist, are dropped). A reply that was cut off is refused with a message saying so. Shelf validates, prints what it is about to add (title, slug, what it declares for storage and network, its link) and asks **Add it?** Nothing is written before you say yes, and a leaked secret is caught before anything touches git.
+
+No clipboard tool on your system (it uses `pbpaste`, PowerShell, `wl-paste`, `xclip` or `xsel`)? Pipe it: `pbpaste | python shelf add -`.
+
+Add `--commit` to also commit just that artifact (other staged changes are left alone), or `--push` to commit and push. Neither happens unless you pass it. On `main`, pushing deploys.
+
+### From a file
 
 Save the reply as `my-app.html`, then:
 
@@ -44,6 +62,19 @@ python shelf add my-app.html --yes \
 | `--install`, `--featured`, `--draft`, `--status experiment\|finished` | Metadata shortcuts. |
 
 A folder works too (`python shelf add my-app/`, needs an `index.html`): local assets are copied, dotfiles are skipped and symbolic links that leave the folder are refused.
+
+### From GitHub, without cloning (phone-friendly)
+
+1. On the repository page: **Add file → Create new file**. Name it `inbox/anything.html`, paste the HTML from the chat, and under *Commit changes* choose **Create a new branch and start a pull request**.
+2. The *Ingest inbox* workflow runs on that pull request. It adds the artifact exactly as `shelf add --yes` would, deletes the inbox file, commits the result to the same branch, validates, builds, and comments with a table (file, result, address) or the reason it could not add a file.
+3. Check the comment, then **Merge**. The normal deploy workflow publishes it.
+
+Rules of the inbox:
+
+- A file named after an existing artifact (`focus-timer.html` while `artifacts/focus-timer/` exists) **updates** it: `created`, the short link and aliases are kept, `updated` is set to today, and the PR shows the diff. Any other name is a new artifact. A title that is already taken is refused, not silently renamed.
+- Required metadata is never guessed. If the AI left out the description or tool, the comment says so; edit the file in the PR and push again.
+- The job only runs for pull requests from this repository by its owner, and refuses a PR that changes anything outside `inbox/` and `artifacts/`. It never executes the HTML.
+- **Secrets:** the file is committed to a public repository before it is scanned. If the scan finds a key, delete the branch and rotate the key. The "Spec + prompt" text tells the AI never to include one, but for anything you are unsure about, use the clipboard route, which scans first.
 
 ## 3. Look at it
 

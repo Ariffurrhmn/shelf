@@ -14,7 +14,10 @@ crawlers. Instead the build writes them into real HTML files:
 from __future__ import annotations
 
 import html
+import re
 from datetime import date
+
+html_escape = lambda s: html.escape(s, quote=True)  # noqa: E731
 
 BASE_PLACEHOLDER = "__SHELF_BASE_URL__"
 SITE_IMAGE = "og.png"
@@ -43,7 +46,7 @@ def inject_gallery_csp(index_html: str) -> str:
     return index_html.replace("<head>", "<head>\n    " + tag, 1) if "Content-Security-Policy" not in index_html else index_html
 
 
-def share_tags(*, title: str, description: str, url: str, image: str, kind: str = "article") -> str:
+def share_tags(*, title: str, description: str, url: str, image: str, kind: str = "article", with_description: bool = True) -> str:
     """Open Graph + Twitter card tags (already HTML-escaped)."""
     e = lambda s: html.escape(s, quote=True)  # noqa: E731
     return "\n".join(
@@ -58,9 +61,23 @@ def share_tags(*, title: str, description: str, url: str, image: str, kind: str 
             f'<meta name="twitter:title" content="{e(title)}">',
             f'<meta name="twitter:description" content="{e(description)}">',
             f'<meta name="twitter:image" content="{e(image)}">',
-            f'<meta name="description" content="{e(description)}">',
+            *([f'<meta name="description" content="{e(description)}">'] if with_description else []),
         ]
     )
+
+
+def artifact_head_tags(html: str, *, title: str, description: str, url: str, image: str) -> str:
+    """Canonical + Open Graph + Twitter tags for an artifact page, skipping what the author already set.
+
+    The artifact is the page people share (its short address), and crawlers do not run JavaScript,
+    so the tags have to be in the served HTML itself."""
+    if 'property="og:title"' in html or "property='og:title'" in html:
+        return ""
+    has_description = bool(re.search(r"<meta[^>]+name=[\"']description[\"']", html, re.I))
+    tags = share_tags(title=title, description=description, url=url, image=image, with_description=not has_description)
+    if not re.search(r"<link[^>]+rel=[\"']canonical[\"']", html, re.I):
+        tags += f'\n<link rel="canonical" href="{html_escape(url)}">'
+    return tags + "\n"
 
 
 def robots_txt(base: str) -> str:

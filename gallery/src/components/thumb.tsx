@@ -5,7 +5,7 @@ import { hueFromSlug } from "@/lib/format"
 import type { Artifact } from "@/types"
 
 /**
- * The project's screenshot at a fixed 8:5 ratio (so nothing shifts while images load).
+ * The artifact's screenshot at a fixed 8:5 ratio (so nothing shifts while images load).
  * Without a screenshot, or if it fails to load, a quiet placeholder tinted from the slug is shown.
  */
 export function Thumb({ artifact, sizes, eager = false }: { artifact: Artifact; sizes: string; eager?: boolean }) {

@@ -25,6 +25,8 @@ Shelf is a personal collection with one author, so the working assumption is: *y
 | No third-party requests from the gallery | design | Fonts are self-hosted; no analytics. |
 | Request allowlist while taking screenshots | `thumbnails.cjs` | A page being screenshotted can only reach the local server and its declared hosts; popups are closed, downloads and permissions are off. |
 | Least-privilege CI | workflow | The build job has `contents: read` and no secrets; only the deploy job (main only) can publish. |
+| Scan before write | `shelf add --clipboard` | Pasted HTML is parsed and validated (secrets, undeclared storage/network) before any file is created or committed. |
+| Guarded write access | `ingest.yml` | The one workflow with write permission runs only for same-repo PRs by the owner, checks that only `inbox/` and `artifacts/` changed *before* running any repository code, and never executes uploaded HTML. Everything from an upload is code-formatted in its PR comment. |
 | Safe CLI | `shelf add` | Slug and path traversal, overwriting without `--force`, symlinks that leave the folder, half-written artifacts (staged and moved in one step). |
 | Link rendering | gallery | External `source` links render only for `http(s)` and with `rel="noopener noreferrer"`. |
 
@@ -32,10 +34,11 @@ Shelf is a personal collection with one author, so the working assumption is: *y
 
 - **Artifacts share one origin.** Everything is served from the same origin (`<user>.github.io`). A script in one artifact can read and overwrite another artifact's `localStorage`, IndexedDB and cookies, the gallery's theme and sort preference, and can open the gallery in a window and script it. The CSP limits *network*, not *storage or DOM access*. Slug-prefixed keys prevent accidents, not attacks.
 - **Navigation is not blocked.** CSP cannot stop a script from sending the page to another site (`location = …`). The validator warns about the obvious forms; obfuscated code can avoid the pattern.
-- **Direct opening is on the trusted origin.** A sandboxed iframe protects a page that *embeds* an artifact, but a visitor can always open `…/artifacts/<slug>/` directly, where no sandbox applies. For that reason the gallery does not embed artifacts live: it shows a static screenshot and links to the artifact.
+- **Direct opening is on the trusted origin.** A sandboxed iframe protects a page that *embeds* an artifact, but a visitor can always open `…/<code>/` directly, where no sandbox applies. For that reason the gallery does not embed artifacts live: it shows a static screenshot and links to the artifact.
 - **Pattern scans miss things.** Secrets split across strings, encoded data, or personal information in images are not detected.
 - **Declared domains are trusted.** If an artifact declares `api.example.com`, the CSP allows it, including for sending data there.
 - **Screenshots execute the page** in headless Chromium on the CI runner (Playwright's default launch options, which do not enable the Chromium sandbox). The runner is ephemeral and holds no secrets, and the request allowlist limits what the page can reach, but it is not a hardened sandbox.
+- **The inbox commits before it scans.** A file uploaded to `inbox/` is in a public repository the moment it is committed, even on an unmerged branch. A secret in it would be caught (and block the PR) but would already be in git history: delete the branch and rotate the key. The clipboard route has no such window.
 - **Drafts are public.** `draft: true` only hides an artifact from the site; the file is in the public repository.
 
 ## Isolating untrusted artifacts properly

@@ -1,0 +1,100 @@
+name: Ingest inbox
+
+# Turns .html files dropped into inbox/ (via the GitHub web UI: Add file -> Create new file, then
+# "create a new branch and start a pull request") into artifacts, on that same pull request.
+# Merge the PR to publish; the normal deploy workflow does the rest. See inbox/README.md.
+
+on:
+  pull_request:
+    paths: ["inbox/**"]
+
+# This job pushes one commit to the pull-request branch and writes one comment, so it needs write
+# access. It is therefore limited below: same-repository branches, opened by the repository owner,
+# touching only inbox/ and artifacts/. Uploaded HTML is parsed and validated, never executed.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ingest-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      # Runs before any code from the branch: a pull request that edits tools, workflows or the CLI
+      # must not get to run them with write access.
+      - name: Only inbox/ and artifacts/ may change
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          outside=$(git diff --name-only "$BASE"...HEAD | grep -v -e '^inbox/' -e '^artifacts/' || true)
+          if [ -n "$outside" ]; then
+            echo "::error::This pull request changes files outside inbox/ and artifacts/, so the inbox job will not run it:"
+            echo "$outside"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: gallery/package-lock.json
+
+      - name: Add the files in inbox/
+        id: ingest
+        continue-on-error: true
+        run: python shelf ingest --report ingest-report.md
+
+      - name: Commit the result to this pull request
+        run: |
+          git config user.name "shelf-inbox"
+          git config user.email "shelf-inbox@users.noreply.github.com"
+          git add -A artifacts inbox
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "Add artifacts from the inbox"
+            git push
+          fi
+
+      # Commits pushed with the default token do not start other workflows, so check here.
+      - name: Validate
+        run: python shelf validate --strict
+
+      - name: Existing links still work
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: python shelf links --compare "$BASE"
+
+      - name: Build the site (no browser)
+        run: |
+          (cd gallery && npm ci)
+          python tools/build/build.py --no-thumbnails --strict
+
+      - name: Comment on the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ -f ingest-report.md ] || echo "The inbox step produced no report. See the workflow log." > ingest-report.md
+          gh pr comment "$PR" --body-file ingest-report.md
+
+      - name: Fail if a file could not be added
+        if: steps.ingest.outcome == 'failure'
+        run: exit 1

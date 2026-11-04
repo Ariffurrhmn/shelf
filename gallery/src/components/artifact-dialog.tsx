@@ -6,7 +6,7 @@ import { Thumb } from "@/components/thumb"
 import { useCopy } from "@/hooks/use-copy"
 import { formatDate, safeHttpUrl } from "@/lib/format"
 import { KIND_META, STATUS_LABEL } from "@/lib/kinds"
-import { absoluteUrl, shareLabel, shareUrl } from "@/lib/url"
+import { shareLabel, shareUrl } from "@/lib/url"
 import type { Artifact } from "@/types"
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -27,9 +27,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-export function ProjectDialog({ active, onClose, onCloseFocus }: { active: Artifact | null; onClose: () => void; onCloseFocus: () => void }) {
+export function ArtifactDialog({ active, onClose, onCloseFocus }: { active: Artifact | null; onClose: () => void; onCloseFocus: () => void }) {
   const { copied, copy } = useCopy()
-  // Keep showing the last project while the closing animation plays, instead of an empty panel.
+  // Keep showing the last artifact while the closing animation plays, instead of an empty panel.
   const last = useRef<Artifact | null>(null)
   if (active) last.current = active
   const artifact = active ?? last.current
@@ -71,7 +71,7 @@ export function ProjectDialog({ active, onClose, onCloseFocus }: { active: Artif
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <a href={artifact.url} className="btn btn-primary">
-                    Open project <ArrowUpRight aria-hidden />
+                    Open artifact <ArrowUpRight aria-hidden />
                   </a>
                   <button type="button" className="btn btn-secondary" onClick={() => copy(shareUrl(artifact, href))}>
                     {copied ? <Check aria-hidden /> : <Link2 aria-hidden />} {copied ? "Copied" : "Copy link"}
@@ -118,11 +118,8 @@ export function ProjectDialog({ active, onClose, onCloseFocus }: { active: Artif
                       </Row>
                     )}
                     <Row label="Safety">
-                      Runs on this site's own address, so it shares browser storage with the other projects here. Network access is limited to the
+                      Runs on this site's own address, so it shares browser storage with the other artifacts here. Network access is limited to the
                       domains listed above.
-                    </Row>
-                    <Row label="Address">
-                      <code className="font-mono text-[0.8125rem] break-all">{absoluteUrl(artifact.url, href)}</code>
                     </Row>
                   </dl>
                 </details>

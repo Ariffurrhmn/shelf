@@ -23,11 +23,12 @@ It is a personal project, built for one author. It is not a platform: no account
 
 ## What you get
 
-- **A gallery worth showing off.** Editorial design, light and dark themes, image-first cards, featured projects, and a details view with the why, the notes and the technical facts.
+- **A gallery worth showing off.** Editorial design, light and dark themes, image-first cards, featured artifacts, and a details view with the why, the notes and the technical facts.
 - **Fast discovery.** Search (press `/`), category, tag and "installable" filters, four sort orders, shareable filtered URLs.
 - **Publishing in one command.** `python shelf add my-app.html` validates, names, files and describes an artifact, with nothing half-written if it fails.
-- **Permanent links.** Short links like `…/shelf/74ng`, redirects for renamed projects, and a CI check that fails if a published link would stop working.
-- **Sharing that looks right.** Open Graph and Twitter cards on every short link, a social preview image, sitemap and robots.
+- **Short, permanent links.** Every artifact lives at a 4-character address like `…/shelf/74ng` (add `#3` for slide 3). Renamed artifacts keep their old addresses, and a CI check fails if a published link would stop working.
+- **A one-click brief for any AI.** The **Spec + prompt** button copies the prompt, the full spec and the metadata reference, ready to paste into Claude or ChatGPT.
+- **Sharing that looks right.** Open Graph and Twitter cards on every artifact address, a social preview image, sitemap and robots.
 - **Installable apps.** Mark an artifact `install: true` and it becomes an offline app on desktop or phone.
 - **Safer by default.** A browser-enforced network policy per artifact, secret scanning, request-limited screenshots, least-privilege CI. See [Security](#security-and-its-limits) for what is *not* covered.
 
@@ -49,12 +50,19 @@ python shelf preview                   # builds the site and serves http://127.0
 
 ### Add a creation
 
+Three ways, from least to most setup. All of them validate first and never publish by themselves.
+
+**1. From the clipboard** (at your computer). Press **Spec + prompt** on the site and paste it into Claude or ChatGPT before you ask for the app. When the reply arrives, click Copy on its code block, then:
+
 ```bash
-python shelf prompt                    # give this to Claude / ChatGPT before you ask for the app
-python shelf add my-app.html           # asks for anything missing, validates, files it
-python shelf preview my-app            # see it in the real gallery
-git add artifacts/my-app && git commit -m "Add my app" && git push
+python shelf add --clipboard           # keeps just the HTML, validates, asks "Add it?"
+python shelf preview <slug>            # see it in the real gallery
+python shelf add --clipboard --yes --push   # or: no questions, commit and push (to main this deploys)
 ```
+
+**2. From a file.** `python shelf add my-app.html` (or a folder with an `index.html`), then commit and push yourself.
+
+**3. From GitHub, without cloning** (works on a phone). Put the HTML in `inbox/`: on the repo page choose *Add file → Create new file*, name it `inbox/anything.html`, paste, and choose *create a new branch and start a pull request*. A workflow turns it into an artifact on that PR and comments with the result; merge to publish. Name the file after an existing artifact (`focus-timer.html`) to update it. Details and a caveat about secrets: [`inbox/README.md`](inbox/README.md).
 
 Non-interactive (scripts, CI):
 
@@ -69,14 +77,15 @@ The full walkthrough, all flags and troubleshooting are in [`docs/ai-workflow.md
 
 | Command | What it does |
 | --- | --- |
-| `shelf add <file\|folder>` | Import HTML as a new artifact. `--dry-run`, `--fix`, `--force`, `--thumbnail`, metadata flags. |
+| `shelf add <file\|folder\|->` / `--clipboard` | Import HTML as a new artifact. `--dry-run`, `--fix`, `--force`, `--thumbnail`, `--commit`, `--push`, metadata flags. |
+| `shelf ingest` | Turn the files in `inbox/` into artifacts (what the inbox workflow runs). |
 | `shelf validate [slug…]` | Check against the spec. `--strict` fails on warnings; `--json` for tools. |
 | `shelf list` | The collection at a glance (`--json`). |
 | `shelf preview [slug]` | Build and serve under `/shelf/` like GitHub Pages. `--raw` serves `artifacts/` instantly. |
 | `shelf rename <old> <new>` | Rename without breaking the old address or short link. |
-| `shelf links [--compare REF]` | List short links; check nothing published at `REF` disappeared. |
+| `shelf links [--compare REF]` | List short links; check nothing published at `REF` disappeared (intentional removals go in `retired.json`). |
 | `shelf doctor` | Check Python, Node, dependencies, artifacts and link plan. |
-| `shelf prompt` | Print the instructions to give an AI assistant. |
+| `shelf prompt [--full]` | Print the instructions for an AI assistant (`--full` adds the spec and metadata reference, like the site's button). |
 
 `shelf` never pushes or deploys. Publishing is a `git push` you do yourself.
 
@@ -175,7 +184,7 @@ What this does **not** do: all artifacts are served from one origin, so a hostil
 
 Built toward WCAG 2.2 AA: colour tokens are contrast-checked in both themes (`gallery/scripts/check-contrast.mjs`), full keyboard use, a skip link, one visible focus style, focus-trapped dialog that returns focus to the button that opened it, reduced-motion support, 44 px touch targets on touch screens, and screen-reader announcements for result counts and copied links. This has been tested with automated browser checks, not with a screen reader or a formal audit.
 
-Measured on the built site in headless Chromium (no throttling): gallery JS 93 KB gzip, CSS 7 KB gzip, two self-hosted font files (51 KB), thumbnails 5–15 KB each, layout shift 0.002–0.007, first contentful paint about 150–180 ms. Filtering 500 projects re-renders in about 200 ms. Numbers on real devices and networks will differ.
+Measured on the built site in headless Chromium (no throttling): gallery JS 94 KB gzip, CSS 7 KB gzip, two self-hosted font files (51 KB), thumbnails 5–15 KB each, layout shift 0.002–0.007, first contentful paint about 150–180 ms. Filtering 500 artifacts re-renders in about 200 ms. Numbers on real devices and networks will differ.
 
 ## Troubleshooting
 
@@ -190,7 +199,7 @@ Measured on the built site in headless Chromium (no throttling): gallery JS 93 K
 
 ## Roadmap
 
-See [`docs/roadmap.md`](docs/roadmap.md). Next: turn on Pages, add real projects (see [`docs/collection.md`](docs/collection.md)), choose a final domain.
+See [`docs/roadmap.md`](docs/roadmap.md). Next: turn on Pages, add real artifacts (see [`docs/collection.md`](docs/collection.md)), choose a final domain.
 
 ## Repository About and topics
 

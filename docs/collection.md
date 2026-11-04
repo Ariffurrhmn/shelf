@@ -4,12 +4,12 @@ The gallery is only as good as what is on it. This page is about curating it hon
 
 ## Current state
 
-The repository ships four published sample artifacts (`pomodoro-timer`, `snake-game`, `shelf-intro-slides`, `url-shortener`) and one draft (`wip-example`). They are labelled as samples in their tags and notes. Shelf 2.0 did **not** add, remove or re-describe any of them, and nothing is marked `featured`: those choices (and any claim about how they were made) are yours.
+The repository ships three published sample artifacts (`pomodoro-timer`, `snake-game`, `shelf-intro-slides`) and one draft (`wip-example`). The `url-shortener` sample was removed at the owner's request; its addresses are listed in `retired.json`. They are labelled as samples in their tags and notes. Shelf 2.0 did **not** add, remove or re-describe any of them, and nothing is marked `featured`: those choices (and any claim about how they were made) are yours.
 
 ## Recommendations (nothing here is done for you)
 
-- **Replace samples with real work** as it exists. Delete a sample with `git rm -r artifacts/<slug>` only after checking `python shelf links --compare origin/main`; if you have shared its link, keep it by adding the slug to the `aliases` of its replacement.
-- **Feature 1–3 projects**: the ones you would show a stranger first. `python shelf add … --featured`, or set `"featured": true`. More than three dilutes the strip.
+- **Replace samples with real work** as it exists. Delete a sample with `git rm -r artifacts/<slug>`, then add its slug to `retired.json` (`"artifacts"`) so CI knows the removal is on purpose; if you have shared its link and want it to keep working, add the slug to the `aliases` of its replacement instead.
+- **Feature 1–3 artifacts**: the ones you would show a stranger first. `python shelf add … --featured`, or set `"featured": true`. More than three dilutes the strip.
 - **Mark maturity honestly** with `status`: `finished` for things you use, `experiment` for things you tried. Leave it out when unsure.
 - **Write the one-line description for a stranger**: what it does, not what it is built with. Put the story in `why` and `notes`; both show in the details view.
 - **Keep tags few and reused.** A tag used once is not a filter. Aim for 5–15 tags across the collection; lowercase, singular (`timer`, not `Timers`). `shelf list` and the gallery's Tags panel show counts.

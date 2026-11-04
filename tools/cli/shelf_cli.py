@@ -2,13 +2,15 @@
 """shelf: add, check and preview artifacts. Standard library only (Python 3.9+).
 
     shelf add my-app.html            import a generated HTML file as a new artifact
+    shelf add --clipboard            ...or the HTML you just copied from Claude / ChatGPT
+    shelf ingest                     turn files dropped in inbox/ into artifacts (used by the inbox workflow)
     shelf validate [slug ...]        check artifacts against spec/SPEC.md
     shelf list                       show the collection
     shelf preview [slug]             build the site and serve it locally (--raw: no build)
     shelf rename OLD NEW             rename an artifact without breaking its links
     shelf links [--compare REF]      show short links; check none disappeared since REF
     shelf doctor                     check the local setup
-    shelf prompt                     print the instructions to give an AI assistant
+    shelf prompt [--full]            print the instructions to give an AI assistant
 
 Nothing here pushes to GitHub or deploys. Publishing is a git push you do yourself.
 """
@@ -37,6 +39,7 @@ sys.path.insert(0, str(REPO / "tools" / "validate"))
 sys.path.insert(0, str(REPO / "tools" / "build"))
 import shelf_validate as sv  # noqa: E402
 import shortlinks  # noqa: E402
+import specbundle  # noqa: E402
 
 ARTIFACTS = REPO / "artifacts"
 MAX_SOURCE_BYTES = 5_000_000
@@ -216,6 +219,61 @@ class Prompter:
 # --------------------------------------------------------------------------
 
 
+def read_clipboard() -> str:
+    """Text on the system clipboard, using whichever standard tool the platform has."""
+    ps = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"
+    if sys.platform == "darwin":
+        candidates = [["pbpaste"]]
+    elif sys.platform.startswith("win"):
+        candidates = [["powershell", "-NoProfile", "-Command", ps]]
+    else:
+        candidates = [["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-o"], ["xsel", "--clipboard", "--output"]]
+        if os.environ.get("WSL_DISTRO_NAME"):  # Linux inside Windows: use the Windows clipboard
+            candidates.insert(0, ["powershell.exe", "-NoProfile", "-Command", ps])
+    for cmd in candidates:
+        if not shutil.which(cmd[0]):
+            continue
+        done = subprocess.run(cmd, capture_output=True, check=False)
+        if done.returncode == 0:
+            return done.stdout.decode("utf-8-sig", errors="replace")
+    raise ShelfError(
+        "No clipboard tool found (looked for " + ", ".join(c[0] for c in candidates) + "). "
+        "Pipe the text in instead: `pbpaste | python shelf add -` (or `xclip -o -selection clipboard | python shelf add -`)."
+    )
+
+
+_DOC_START = re.compile(r"<!doctype\s+html|<html[\s>]", re.I)
+_DOC_END_OWN_LINE = re.compile(r"^[ \t]*</html>[ \t]*$", re.I | re.M)
+
+
+def extract_html(text: str) -> str:
+    """The HTML document inside pasted text.
+
+    Chat replies wrap the file in Markdown fences and add commentary (a checklist, "here is your app").
+    This keeps only the document: from <!doctype html> / <html> to the last </html> that sits on its
+    own line (so a commentary line that merely mentions </html> does not extend it)."""
+    start = _DOC_START.search(text)
+    if not start:
+        raise ShelfError("No HTML document found (looked for <!doctype html> or <html>). Copy the whole code block from the reply.")
+    chunk = text[start.start():]
+    ends = list(_DOC_END_OWN_LINE.finditer(chunk))
+    if ends:
+        end = ends[-1].end()
+    else:
+        idx = chunk.lower().rfind("</html>")
+        if idx == -1:
+            raise ShelfError("The HTML starts but never ends (no </html>). The reply was probably cut off, or only part of it was copied.")
+        end = idx + len("</html>")
+    return chunk[:end].rstrip() + "\n"
+
+
+def _check_html_text(html: str, name: str) -> None:
+    if len(html.encode("utf-8")) > MAX_SOURCE_BYTES:
+        raise ShelfError(f"{name} is larger than {MAX_SOURCE_BYTES // 1_000_000} MB; Shelf artifacts are meant to be small.")
+    if not re.search(r"<\s*(html|head|body|!doctype)", html, re.I):
+        raise ShelfError(f"{name} does not look like an HTML document (no <html>, <head> or <body>).")
+
+
 def _read_source(src: Path) -> tuple[Path, str]:
     """Return (kind-specific root, html) for a file or a folder that has index.html."""
     if not src.exists():
@@ -231,8 +289,7 @@ def _read_source(src: Path) -> tuple[Path, str]:
         html = entry.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         raise ShelfError(f"{entry.name} is not UTF-8 text. Save it as UTF-8 and try again.") from None
-    if not re.search(r"<\s*(html|head|body|!doctype)", html, re.I):
-        raise ShelfError(f"{entry.name} does not look like an HTML document (no <html>, <head> or <body>).")
+    _check_html_text(html, entry.name)
     return src, html
 
 
@@ -270,17 +327,28 @@ def existing_slugs(artifacts: Path) -> set[str]:
 def cmd_add(args: argparse.Namespace) -> int:
     artifacts = Path(args.artifacts_dir)
     p = Prompter(interactive=sys.stdin.isatty() and not args.yes)
-    src, html = _read_source(Path(args.source))
+    from_text = bool(args.clipboard) or args.source == "-"
+    if from_text:
+        if args.source not in (None, "-"):
+            raise ShelfError("Give either a file or --clipboard, not both.")
+        html = extract_html(read_clipboard() if args.clipboard else sys.stdin.read())
+        _check_html_text(html, "The pasted text")
+        src, stem = None, "untitled"
+    else:
+        if not args.source:
+            raise ShelfError("Say what to add: a file or folder (`shelf add my-app.html`), or `--clipboard`.")
+        src, html = _read_source(Path(args.source))
+        stem = Path(args.source).stem
     info = page_info(html)
     taken = existing_slugs(artifacts)
 
     # --- metadata: flags beat the file's own block beats what we can infer
     base = dict(info["meta"])
-    title = args.title or base.get("title") or p.ask("Title", info["title"] or Path(args.source).stem.replace("-", " ").replace("_", " ").title())
+    title = args.title or base.get("title") or p.ask("Title", info["title"] or stem.replace("-", " ").replace("_", " ").title())
     if not title:
         raise ShelfError("A title is required. Pass --title.")
     explicit_slug = args.slug is not None
-    slug = args.slug or slugify(title) or slugify(Path(args.source).stem)
+    slug = args.slug or slugify(title) or slugify(stem)
     if not slug or not sv.SLUG_RE.match(slug):
         raise ShelfError(f"{(args.slug or title)!r} cannot be turned into a valid slug. Pass --slug with lowercase letters, digits and hyphens.")
     dest = safe_child(artifacts, slug)
@@ -327,6 +395,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         "color": base.get("color"),
         "draft": True if args.draft else base.get("draft"),
     }
+    if old_meta and not base.get("updated") and (old_meta.get("created") or "") <= dt.date.today().isoformat():
+        optional["updated"] = dt.date.today().isoformat()  # replacing an existing artifact is an update
     meta.update({k: v for k, v in optional.items() if v not in (None, [], "")})
     if args.thumbnail:
         img = Path(args.thumbnail)
@@ -352,7 +422,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     try:
         staged = stage_root / slug
         staged.mkdir()
-        if src.is_dir():
+        if src is not None and src.is_dir():
             _copy_tree(src, staged)
         html_out = fix_basics(html) if args.fix else html
         (staged / "index.html").write_text(upsert_meta_block(html_out, meta), encoding="utf-8")
@@ -371,6 +441,13 @@ def cmd_add(args: argparse.Namespace) -> int:
 
         short = meta.get("short") or shortlinks.auto_code(slug)
         base_url = shortlinks.base_url() or shortlinks.DEFAULT_BASE_URL
+        if from_text and p.interactive and not args.dry_run:
+            use = [f"storage: {meta.get('storage', 'none')}", f"network: {', '.join(meta.get('network', [])) or 'none'}"]
+            print(f"\nAbout to add {meta['title']!r} as {slug!r} ({meta['kind']}; {'; '.join(use)}).")
+            print(f"It will be served at {base_url}{short}")
+            if not p.confirm("Add it?", True):
+                print("Nothing added.")
+                return 1
         if args.dry_run:
             print(f"\nDry run: nothing written. Would create {dest.relative_to(REPO) if dest.is_relative_to(REPO) else dest}")
             print(f"metadata:\n{json.dumps(meta, indent=2, ensure_ascii=False)}")
@@ -386,15 +463,37 @@ def cmd_add(args: argparse.Namespace) -> int:
         shutil.rmtree(stage_root, ignore_errors=True)
 
     rel = dest.relative_to(REPO) if dest.is_relative_to(REPO) else dest
-    print(f"\nAdded {rel}/index.html")
-    print(f"  short link:  {base_url}{short}  (after publishing)")
-    print(f"  full link:   {base_url}artifacts/{slug}/")
+    args.result = {"slug": slug, "title": meta["title"], "short": short, "link": f"{base_url}{short}", "updated": bool(old_meta)}
+    print(f"\n{'Updated' if old_meta else 'Added'} {rel}/index.html")
+    print(f"  link:        {base_url}{short}  (after publishing; add #3 to open slide 3 of a deck)")
     print("  thumbnail:   " + ("your image" if args.thumbnail else "generated automatically by the build (cached)"))
-    print("\nNext steps")
-    print(f"  1. python shelf preview {slug}     # look at it in the full gallery")
-    print(f"  2. git add artifacts/{slug} && git commit -m \"Add {meta['title']}\"")
-    print("  3. git push                          # the workflow validates, builds and deploys")
+    if args.commit or args.push:
+        _commit_and_push(artifacts.parent, slug, f"{'Update' if old_meta else 'Add'} {meta['title']}", push=args.push)
+        print("\nNext steps")
+        print(f"  python shelf preview {slug}     # look at it in the full gallery")
+        if not args.push:
+            print("  git push                          # the workflow validates, builds and deploys")
+    else:
+        print("\nNext steps")
+        print(f"  1. python shelf preview {slug}     # look at it in the full gallery")
+        print(f"  2. git add artifacts/{slug} && git commit -m \"Add {meta['title']}\"")
+        print("  3. git push                          # the workflow validates, builds and deploys")
     return 0
+
+
+def _commit_and_push(root: Path, slug: str, message: str, push: bool) -> None:
+    """Commit only this artifact's folder (other staged changes are left alone); push only when asked."""
+    path = f"artifacts/{slug}"
+    git("add", "--", path, cwd=root)
+    git("commit", "-q", "-m", message, "--", path, cwd=root)
+    print(f"  committed:   {message!r}")
+    if push:
+        branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=root).strip()
+        if branch in ("main", "master"):
+            print(f"  note: {branch} is the branch that deploys the site, so this publishes it.")
+        has_upstream = bool(git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", cwd=root, check=False).strip())
+        git(*(["push"] if has_upstream else ["push", "-u", "origin", "HEAD"]), cwd=root)
+        print(f"  pushed:      {branch}")
 
 
 def _backup(dest: Path) -> Path:
@@ -434,6 +533,81 @@ def _check_links(artifacts: Path, slug: str, result: sv.Result, replacing: str |
     clash = sv.crosscheck([*others, result])
     if clash:
         raise ShelfError("\n".join(clash))
+
+
+# --------------------------------------------------------------------------
+# ingest (the inbox)
+# --------------------------------------------------------------------------
+
+
+def _md_code(text: str) -> str:
+    """Untrusted text as a safe Markdown code span (no @mentions, no formatting, no fence breaks)."""
+    return "`" + " ".join(str(text).split()).replace("`", "'") + "`"
+
+
+def ingest_report(results: list[dict]) -> str:
+    """Markdown for a pull-request comment. Everything that came from an uploaded file is code-formatted."""
+    lines = ["### Shelf inbox", ""]
+    if not results:
+        return "\n".join(lines + ["The inbox is empty: nothing to add."]) + "\n"
+    lines += ["| File | Result | Address |", "| --- | --- | --- |"]
+    for r in results:
+        address = f"`{r['link']}`" if r.get("link") else "-"
+        lines.append(f"| {_md_code(r['file'])} | {r['status']} | {address} |")
+    for r in results:
+        if r["status"] == "failed":
+            body = r["output"].strip().replace("```", "~~~")[-3000:]
+            lines += ["", f"<details open><summary>{_md_code(r['file'])} was not added</summary>", "", "```text", body, "```", "", "</details>"]
+    if any(r["status"] != "failed" for r in results):
+        lines += ["", "Merge this PR to publish. Check the title and description above first; to look at one artifact in the full gallery, run `python shelf preview <slug>` on your machine."]
+    return "\n".join(lines) + "\n"
+
+
+def cmd_ingest(args: argparse.Namespace) -> int:
+    """Turn every .html file in inbox/ into an artifact, exactly as `shelf add --yes` would.
+
+    A file named after an existing slug (focus-timer.html) updates that artifact; any other name is a
+    new artifact, and a title that is already taken is refused rather than silently suffixed.
+    Failed files stay in the inbox. The HTML is parsed and validated, never executed."""
+    import contextlib
+    import io
+
+    artifacts = Path(args.artifacts_dir)
+    inbox = Path(args.inbox) if args.inbox else artifacts.parent / "inbox"
+    files = sorted(p for p in inbox.glob("*") if p.is_file() and not p.name.startswith(".") and p.name.lower() != "readme.md") if inbox.is_dir() else []
+    parser = build_parser()
+    results: list[dict] = []
+    for f in files:
+        entry: dict = {"file": f.name, "status": "failed", "output": ""}
+        results.append(entry)
+        if f.suffix.lower() not in (".html", ".htm"):
+            entry["output"] = f"{f.name}: only .html files can be added from the inbox."
+            continue
+        update = sv.SLUG_RE.match(f.stem) is not None and (artifacts / f.stem).is_dir()
+        argv = ["--artifacts-dir", str(artifacts), "add", str(f), "--yes"]
+        argv += ["--slug", f.stem, "--force"] if update else []
+        argv += ["--dry-run"] if args.dry_run else []
+        ns = parser.parse_args(argv)
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                rc = cmd_add(ns)
+        except ShelfError as exc:
+            rc = 1
+            buf.write(f"error: {exc}\n")
+        entry["output"] = buf.getvalue()
+        if rc == 0:
+            entry["status"] = "would add" if args.dry_run else ("updated" if update else "added")
+            info = getattr(ns, "result", None)
+            if info:
+                entry["link"], entry["slug"] = info["link"], info["slug"]
+            if not args.dry_run:
+                f.unlink()
+    report = ingest_report(results)
+    if args.report:
+        Path(args.report).write_text(report, encoding="utf-8")
+    print(report)
+    return 1 if any(r["status"] == "failed" for r in results) else 0
 
 
 # --------------------------------------------------------------------------
@@ -492,9 +666,9 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
-def git(*cmd: str, check: bool = True) -> str:
+def git(*cmd: str, check: bool = True, cwd: Path | None = None) -> str:
     try:
-        done = subprocess.run(["git", *cmd], cwd=REPO, capture_output=True, text=True, check=check)
+        done = subprocess.run(["git", *cmd], cwd=cwd or REPO, capture_output=True, text=True, check=check)
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = getattr(exc, "stderr", "") or str(exc)
         raise ShelfError(f"git {' '.join(cmd)} failed: {detail.strip()}") from None
@@ -518,8 +692,30 @@ def published_at(ref: str) -> dict[str, dict]:
     return out
 
 
-def links_that_would_break(before: dict[str, dict], results: list[sv.Result], extra_links: dict[str, str]) -> list[str]:
-    """Addresses and short codes published in `before` that no longer resolve now."""
+RETIRED_FILE = REPO / "retired.json"
+
+
+def load_retired(path: Path = RETIRED_FILE) -> tuple[set[str], set[str]]:
+    """(artifact slugs, short codes) that were removed on purpose. A missing file means none."""
+    if not path.is_file():
+        return set(), set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return set(data.get("artifacts", [])), set(data.get("codes", []))
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        raise ShelfError(f"{path.name} must look like {{\"artifacts\": [\"old-slug\"], \"codes\": [\"abcd\"]}}.") from None
+
+
+def links_that_would_break(
+    before: dict[str, dict],
+    results: list[sv.Result],
+    extra_links: dict[str, str],
+    retired: tuple[set[str], set[str]] = (set(), set()),
+) -> list[str]:
+    """Addresses and short codes published in `before` that no longer resolve now.
+
+    Things listed in retired.json were removed on purpose and are not reported."""
+    retired_slugs, retired_codes = retired
     live_names, live_codes = set(), set(extra_links)
     for r in results:
         if r.draft or r.metadata is None:
@@ -529,11 +725,13 @@ def links_that_would_break(before: dict[str, dict], results: list[sv.Result], ex
         live_codes.add(r.metadata.get("short") or shortlinks.auto_code(r.slug))
     problems = []
     for slug, meta in sorted(before.items()):
+        if slug in retired_slugs:
+            continue
         if slug not in live_names:
-            problems.append(f"artifacts/{slug}/ was published but is gone. Add it to the `aliases` of the artifact that replaced it (shelf rename does this), or remove it on purpose.")
+            problems.append(f"artifacts/{slug}/ was published but is gone. Add it to the `aliases` of the artifact that replaced it (shelf rename does this), or list it in retired.json if you removed it on purpose.")
         code = meta.get("short") or shortlinks.auto_code(slug)
-        if code not in live_codes:
-            problems.append(f"short link /{code} (from {slug!r}) no longer exists. Set \"short\": \"{code}\" on the artifact that replaced it.")
+        if code not in live_codes and code not in retired_codes:
+            problems.append(f"short link /{code} (from {slug!r}) no longer exists. Set \"short\": \"{code}\" on the artifact that replaced it, or list it in retired.json if you removed it on purpose.")
     return problems
 
 
@@ -548,7 +746,7 @@ def cmd_links(args: argparse.Namespace) -> int:
     titles = {r.slug: (r.metadata or {}).get("title", r.slug) for r in results}
     print(shortlinks.format_table(shortlinks.describe(plan, titles, base)))
     if args.compare:
-        problems = links_that_would_break(published_at(args.compare), results, extra)
+        problems = links_that_would_break(published_at(args.compare), results, extra, load_retired())
         if problems:
             print(f"\nPermanent links that would break compared with {args.compare}:", file=sys.stderr)
             for pr in problems:
@@ -636,6 +834,14 @@ def _site_is_stale(site: Path, artifacts: Path) -> bool:
     return newest > built
 
 
+def _code_for(artifacts: Path, slug: str) -> str:
+    """The short code an artifact is served at (its own `short`, or the automatic one)."""
+    result = sv.validate_artifact(safe_child(artifacts, slug))
+    if result.draft:
+        raise ShelfError(f"{slug} is a draft: it is not part of the built site. Use --raw to preview it.")
+    return (result.metadata or {}).get("short") or shortlinks.auto_code(slug)
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     artifacts = Path(args.artifacts_dir)
     prefix = ("/" + args.base.strip("/")) if args.base.strip("/") else ""
@@ -654,7 +860,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
             if subprocess.run(cmd, cwd=REPO).returncode != 0:
                 raise ShelfError("The build failed; see the errors above.")
         root = site
-        path = f"/artifacts/{args.slug}/" if args.slug else "/"
+        path = f"/{_code_for(artifacts, args.slug)}/" if args.slug else "/"
     try:
         server = serve_directory(root, args.port, prefix)
     except OSError as exc:
@@ -732,15 +938,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def prompt_text() -> str:
-    text = (REPO / "spec" / "PROMPT.md").read_text(encoding="utf-8")
-    m = re.search(r"````text\n(.*?)\n````", text, re.S)
-    if not m:
-        raise ShelfError("spec/PROMPT.md has no ````text block.")
-    return m.group(1)
+    try:
+        return specbundle.prompt_block(REPO / "spec")
+    except ValueError as exc:
+        raise ShelfError(str(exc)) from None
 
 
 def cmd_prompt(args: argparse.Namespace) -> int:
-    print(prompt_text())
+    print(specbundle.bundle(REPO / "spec") if args.full else prompt_text())
     return 0
 
 
@@ -755,7 +960,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="command", required=True, metavar="command")
 
     a = sub.add_parser("add", help="import an HTML file (or a folder with index.html) as a new artifact")
-    a.add_argument("source", help="path to the HTML file or folder")
+    a.add_argument("source", nargs="?", help="path to the HTML file or folder, or - to read the HTML from stdin")
+    a.add_argument("--clipboard", action="store_true", help="use the HTML on the clipboard (a whole chat reply is fine; only the document is kept)")
+    a.add_argument("--commit", action="store_true", help="after adding, commit just this artifact's folder")
+    a.add_argument("--push", action="store_true", help="commit and push (to main this deploys the site); never done unless you ask")
     a.add_argument("--title")
     a.add_argument("--slug", help="folder name; default: derived from the title")
     a.add_argument("--description", help="one line, 200 characters at most")
@@ -780,6 +988,12 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--dry-run", action="store_true", help="validate and show what would happen; write nothing")
     a.add_argument("-y", "--yes", action="store_true", help="never ask questions")
     a.set_defaults(func=cmd_add)
+
+    ig = sub.add_parser("ingest", help="turn the .html files in inbox/ into artifacts")
+    ig.add_argument("--inbox", help="folder to read (default: inbox/ next to artifacts/)")
+    ig.add_argument("--report", help="also write the Markdown report to this file")
+    ig.add_argument("--dry-run", action="store_true", help="validate everything, change nothing")
+    ig.set_defaults(func=cmd_ingest)
 
     v = sub.add_parser("validate", help="check artifacts against the spec")
     v.add_argument("slugs", nargs="*")
@@ -812,7 +1026,9 @@ def build_parser() -> argparse.ArgumentParser:
     lk.set_defaults(func=cmd_links)
 
     sub.add_parser("doctor", help="check the local setup").set_defaults(func=cmd_doctor)
-    sub.add_parser("prompt", help="print the instructions to give an AI assistant").set_defaults(func=cmd_prompt)
+    pr = sub.add_parser("prompt", help="print the instructions to give an AI assistant")
+    pr.add_argument("--full", action="store_true", help="also include the full spec and metadata reference (what the site's Spec + prompt button copies)")
+    pr.set_defaults(func=cmd_prompt)
     return ap
 
 

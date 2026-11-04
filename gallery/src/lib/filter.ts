@@ -68,7 +68,7 @@ export interface Collection {
 
 /**
  * Splits the (already filtered and sorted) list into the Featured strip and the grid.
- * Featured projects appear once: in the strip when nothing is filtered, and in the grid
+ * Featured artifacts appear once: in the strip when nothing is filtered, and in the grid
  * while searching or filtering, when the strip is hidden. If everything is featured the
  * strip is skipped, because it would just repeat the whole collection.
  */

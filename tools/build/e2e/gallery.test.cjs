@@ -4,7 +4,7 @@
  * Run:           cd tools/build && npm run e2e
  *
  * The site is served under /shelf/ like GitHub Pages. Edge cases that the real collection does
- * not contain (featured projects, aliases, many tags, long titles) use a copy of site/ with a
+ * not contain (featured artifacts, aliases, many tags, long titles) use a copy of site/ with a
  * crafted artifacts.json: the gallery is driven entirely by that file.
  */
 const assert = require("node:assert/strict")
@@ -33,7 +33,7 @@ function entry(i, over = {}) {
   return {
     slug, title: `Project ${i}`, description: `Description of project ${i}.`, created: `2026-0${1 + (i % 9)}-1${i % 9}`, tool: "Claude",
     kind: ["app", "game", "doc", "presentation", "other"][i % 5], tags: [`tag-${i % 14}`, "common"], storage: "none", network: [],
-    notes: null, why: null, status: null, featured: false, updated: null, source: null, aliases: [], url: `artifacts/pomodoro-timer/`, short: null,
+    notes: null, why: null, status: null, featured: false, updated: null, source: null, aliases: [], url: `74ng/`, short: null,
     thumbnail: null, thumbnailSmall: null, thumbnailWidth: null, thumbnailHeight: null, install: false, icon: null, color: null, ...over,
   }
 }
@@ -80,11 +80,11 @@ const waitCards = (page, n) => page.waitForFunction((n) => document.querySelecto
 const titles = (page) => page.locator("article h3").allTextContents()
 
 describe("homepage", () => {
-  test("renders the hero, real counts and one card per project, with no console errors", async () => {
+  test("renders the hero and one card per artifact, without stats lines, with no console errors", async () => {
     const { page, context, problems } = await open(real)
     assert.equal(await page.getByRole("heading", { level: 1 }).innerText(), "Small experiments. Useful creations.")
-    assert.match(await page.locator("section[aria-labelledby=hero-title]").innerText(), /4 projects/)
-    assert.equal(await cards(page).count(), 4)
+    assert.doesNotMatch(await page.locator("body").innerText(), /\d+ categories|built \w{3} \d/, "the stats lines are gone")
+    assert.equal(await cards(page).count(), 3)
     assert.equal(await page.getByRole("heading", { name: "Featured", exact: true }).count(), 0, "no featured section when nothing is featured")
     assert.deepEqual(problems, [])
     await context.close()
@@ -101,7 +101,7 @@ describe("homepage", () => {
   })
 
   for (const width of [320, 375, 390, 768, 1024, 1440, 1920]) {
-    test(`no horizontal scrolling at ${width}px (many projects, long titles)`, async () => {
+    test(`no horizontal scrolling at ${width}px (many artifacts, long titles)`, async () => {
       const { page, context } = await open(fixture, "", { viewport: { width, height: 800 } })
       const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       assert.equal(over, 0)
@@ -122,14 +122,14 @@ describe("homepage", () => {
 describe("discovery", () => {
   test("search is case-insensitive, combines with category, and shows an empty state with a reset", async () => {
     const { page, context } = await open(real)
-    const search = page.getByRole("searchbox", { name: "Search projects" })
+    const search = page.getByRole("searchbox", { name: "Search artifacts" })
     await search.fill("POMODORO")
     await waitTitles(page, ["Pomodoro timer"])
-    assert.match(await page.getByRole("status").first().innerText(), /1 of 4 projects match/)
+    assert.match(await page.getByRole("status").first().innerText(), /1 of 3 artifacts match/)
     await page.getByRole("button", { name: /^Games/ }).click()
     assert.match(await page.getByText("Nothing matches").innerText(), /Nothing matches/)
     await page.getByRole("button", { name: "Clear all filters" }).click()
-    await waitCards(page, 4)
+    await waitCards(page, 3)
     assert.equal(await search.inputValue(), "")
     await context.close()
   })
@@ -137,7 +137,7 @@ describe("discovery", () => {
   test("'/' focuses search but never steals typing, and Escape clears", async () => {
     const { page, context } = await open(real)
     await page.keyboard.press("/")
-    const search = page.getByRole("searchbox", { name: "Search projects" })
+    const search = page.getByRole("searchbox", { name: "Search artifacts" })
     assert.equal(await search.evaluate((el) => el === document.activeElement), true)
     await page.keyboard.type("a/b")
     assert.equal(await search.inputValue(), "a/b")
@@ -149,7 +149,7 @@ describe("discovery", () => {
   test("category and tag filters, sorting, and URL state survive a reload", async () => {
     const { page, context } = await open(real)
     await page.getByRole("button", { name: /^Apps/ }).click()
-    await waitCards(page, 2)
+    await waitCards(page, 1)
     await page.getByRole("button", { name: /^Tags/ }).click()
     await page.getByRole("button", { name: /^#productivity/ }).click()
     await waitTitles(page, ["Pomodoro timer"])
@@ -160,11 +160,11 @@ describe("discovery", () => {
     await waitTitles(page, ["Pomodoro timer"])
     await page.getByRole("button", { name: "Clear filters" }).click()
     await page.getByLabel("Sort").selectOption("title-asc")
-    await waitTitles(page, ["Pomodoro timer", "Shelf: a short introduction", "Snake", "URL shortener"])
+    await waitTitles(page, ["Pomodoro timer", "Shelf: a short introduction", "Snake"])
     await page.getByLabel("Sort").selectOption("oldest")
-    await waitTitles(page, ["Pomodoro timer", "Snake", "Shelf: a short introduction", "URL shortener"])
+    await waitTitles(page, ["Pomodoro timer", "Snake", "Shelf: a short introduction"])
     await page.getByLabel("Sort").selectOption("newest")
-    await waitTitles(page, ["URL shortener", "Shelf: a short introduction", "Snake", "Pomodoro timer"])
+    await waitTitles(page, ["Shelf: a short introduction", "Snake", "Pomodoro timer"])
     await context.close()
   })
 
@@ -178,7 +178,7 @@ describe("discovery", () => {
     await context.close()
   })
 
-  test("featured projects appear once, above the grid, and give way to results while filtering", async () => {
+  test("featured artifacts appear once, above the grid, and give way to results while filtering", async () => {
     const { page, context } = await open(fixture)
     assert.equal(await page.getByRole("heading", { name: "Featured", exact: true }).count(), 1)
     const all = await titles(page)
@@ -243,11 +243,11 @@ describe("details dialog and history", () => {
     await page.getByRole("button", { name: "Close details" }).click()
     await dialog.waitFor({ state: "hidden" })
     assert.equal(page.url(), real.url)
-    assert.equal(await cards(page).count(), 4)
+    assert.equal(await cards(page).count(), 3)
     await context.close()
   })
 
-  test("an old slug (alias) opens the right project and the address is corrected", async () => {
+  test("an old slug (alias) opens the right artifact and the address is corrected", async () => {
     const { page, context } = await open(fixture, "#old-star")
     await page.getByRole("dialog").waitFor()
     assert.equal(page.url().endsWith("#star"), true)
@@ -264,12 +264,12 @@ describe("details dialog and history", () => {
 
   test("technical details are tucked away, and dialog traps focus", async () => {
     const { page, context } = await open(real)
-    await page.getByRole("button", { name: "Details for URL shortener" }).click()
+    await page.getByRole("button", { name: "Details for Pomodoro timer" }).click()
     const dialog = page.getByRole("dialog")
     const details = dialog.locator("details")
     assert.equal(await details.evaluate((d) => d.open), false)
     await dialog.getByText("Technical details").click()
-    assert.match(await details.innerText(), /Saves data in this browser only/)
+    assert.match(await details.innerText(), /Saves nothing/)
     for (let i = 0; i < 12; i++) await page.keyboard.press("Tab")
     assert.equal(await dialog.evaluate((d) => d.contains(document.activeElement)), true)
     await context.close()
@@ -297,28 +297,39 @@ describe("links", () => {
     await context.close()
   })
 
-  test("title and Open project go to the artifact", async () => {
+  test("title goes to the artifact at its short address", async () => {
     const { page, context } = await open(real)
     await page.getByRole("link", { name: "Pomodoro timer", exact: true }).click()
-    await page.waitForURL(/\/shelf\/artifacts\/pomodoro-timer\/$/)
+    await page.waitForURL(/\/shelf\/74ng\/$/)
     assert.match(await page.title(), /Pomodoro/)
     await context.close()
   })
 
-  test("short links redirect to the artifact and carry the #hash", async () => {
+  test("a short address IS the artifact: no redirect, the #slide survives, the address stays short", async () => {
     const context = await browser.newContext()
     const page = await context.newPage()
     await page.goto(`${real.url}pdhh/#3`)
-    await page.waitForURL(/\/shelf\/artifacts\/shelf-intro-slides\/#3$/)
+    assert.equal(page.url(), `${real.url}pdhh/#3`)
+    assert.match(await page.title(), /Shelf/)
+    assert.ok(`${new URL(page.url()).pathname}`.replace("/shelf/", "").replace("/", "").length <= 6, "path after /shelf/ is 6 characters or fewer")
     await context.close()
   })
 
-  test("short-link pages are share cards for crawlers", async () => {
+  test("the old long addresses still work and forward the #hash", async () => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await page.goto(`${real.url}artifacts/shelf-intro-slides/#3`)
+    await page.waitForURL(`${real.url}pdhh/#3`)
+    await context.close()
+  })
+
+  test("the artifact page itself is the share card for crawlers", async () => {
     const context = await browser.newContext()
     const html = await (await context.request.get(`${real.url}74ng/`)).text() // what a crawler sees: no JavaScript
     assert.match(html, /<meta property="og:title" content="Pomodoro timer">/)
     assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/(thumbnails\/[^"]+\.webp|og\.png)">/)
     assert.match(html, /<meta name="twitter:card" content="summary_large_image">/)
+    assert.match(html, /<link rel="canonical" href="https:\/\/[^"]+\/74ng\/">/)
     await context.close()
   })
 
@@ -326,12 +337,35 @@ describe("links", () => {
     const root = await serve(SITE)
     try {
       const { page, context, problems } = await open(root)
-      assert.equal(await cards(page).count(), 4)
+      assert.equal(await cards(page).count(), 3)
       assert.deepEqual(problems, [])
       await context.close()
     } finally {
       await root.close()
     }
+  })
+})
+
+describe("spec + prompt button", () => {
+  test("copies the prompt, the spec and the metadata reference in one go, from the header and the hero", async () => {
+    const { page, context } = await open(real, "", { permissions: ["clipboard-read", "clipboard-write"] })
+    for (const where of ["header", "section[aria-labelledby=hero-title]"]) {
+      await page.evaluate(() => navigator.clipboard.writeText("empty"))
+      await page.locator(where).getByRole("button", { name: /Spec \+ prompt/ }).click()
+      await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes("Part 3")))
+      const text = await page.evaluate(() => navigator.clipboard.readText())
+      for (const needle of ["You are building one artifact", "## 1. Layout", "| `featured` |", "shelf-meta"]) assert.ok(text.includes(needle), `${where}: missing ${needle}`)
+      await page.locator(where).getByRole("button", { name: "Copied" }).waitFor()
+    }
+    await context.close()
+  })
+
+  test("the text is also a plain file next to the site", async () => {
+    const context = await browser.newContext()
+    const res = await context.request.get(`${real.url}shelf-spec.txt`)
+    assert.equal(res.status(), 200)
+    assert.match(await res.text(), /^# Shelf: how to make an artifact/)
+    await context.close()
   })
 })
 
@@ -371,7 +405,7 @@ describe("theme and accessibility", () => {
 })
 
 describe("artifact isolation (Content-Security-Policy)", () => {
-  for (const slug of ["pomodoro-timer", "snake-game", "shelf-intro-slides", "url-shortener"]) {
+  for (const [slug, code] of [["pomodoro-timer", "74ng"], ["snake-game", "bqq6"], ["shelf-intro-slides", "pdhh"]]) {
     test(`${slug}: policy present, page works, no violations`, async () => {
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
       const page = await context.newPage()
@@ -380,7 +414,7 @@ describe("artifact isolation (Content-Security-Policy)", () => {
       page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && problems.push(m.text()))
       page.on("response", (r) => r.status() >= 400 && !r.url().endsWith("/favicon.ico") && problems.push(`${r.status()} ${r.url()}`))
       page.on("pageerror", (e) => problems.push(e.message))
-      await page.goto(`${real.url}artifacts/${slug}/`, { waitUntil: "networkidle" })
+      await page.goto(`${real.url}${code}/`, { waitUntil: "networkidle" })
       assert.match(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content"), /connect-src 'self'/)
       assert.deepEqual(problems, [])
       await context.close()
@@ -390,7 +424,7 @@ describe("artifact isolation (Content-Security-Policy)", () => {
   test("undeclared network requests, and nested sites, are blocked by the browser", async () => {
     const context = await browser.newContext()
     const page = await context.newPage()
-    await page.goto(`${real.url}artifacts/pomodoro-timer/`, { waitUntil: "networkidle" })
+    await page.goto(`${real.url}74ng/`, { waitUntil: "networkidle" })
     const result = await page.evaluate(async () => {
       const out = {}
       try {

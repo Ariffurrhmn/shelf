@@ -82,15 +82,20 @@ class _HeadStart(HTMLParser):
             self.head_end = self._line_starts[line - 1] + col + len(text)
 
 
-def inject_csp(html: str, meta: dict) -> str:
-    """Return `html` with the policy as the first thing in <head> (before any script)."""
+def insert_in_head(html: str, snippet: str) -> str:
+    """Put `snippet` right after the <head> tag (before any script). Found with a real parser."""
     p = _HeadStart()
     p.feed(html)
     p.close()
     if p.head_end is None:
         return html  # the validator requires a <head>; nothing to do without one
+    return html[: p.head_end] + snippet + html[p.head_end :]
+
+
+def inject_csp(html: str, meta: dict) -> str:
+    """Return `html` with the policy as the first thing in <head> (before any script)."""
     tag = f'<meta http-equiv="Content-Security-Policy" content="{policy(meta)}" data-{MARKER}="1">'
-    return html[: p.head_end] + tag + html[p.head_end :]
+    return insert_in_head(html, tag)
 
 
 def harden_artifact(dest: Path, meta: dict) -> None:
