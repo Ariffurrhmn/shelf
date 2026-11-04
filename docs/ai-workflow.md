@@ -6,10 +6,10 @@ Create in Claude / ChatGPT → save the HTML → shelf add → preview → git p
 
 ## 1. Ask the AI for a Shelf-ready file
 
-Print the instructions and paste them at the start of the conversation (or into the assistant's project/custom instructions so every new artifact follows them):
+Press **Spec + prompt** on the site (header or hero): it copies the prompt, the full spec and the metadata reference in one go. The same text is `python shelf prompt --full`; `python shelf prompt` prints just the short prompt. Paste it at the start of the conversation (or into the assistant's project/custom instructions so every new artifact follows them):
 
 ```bash
-python shelf prompt          # prints spec/PROMPT.md's block; pipe it to your clipboard tool
+python shelf prompt --full   # same text as the button; pipe it to your clipboard tool
 ```
 
 Then describe what you want. The assistant asks for anything it does not know (date, tool), writes one `index.html` with the metadata block, declares storage and network honestly, and finishes with a self-check list.

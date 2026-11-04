@@ -112,7 +112,7 @@ class AddCommand(unittest.TestCase):
         self.assertEqual(meta["tool"], "Claude")
         self.assertEqual(meta["tags"], ["productivity", "timer"])
         self.assertRegex(meta["created"], r"^\d{4}-\d{2}-\d{2}$")
-        self.assertIn("short link:", out)
+        self.assertIn("link:", out)
         self.assertIn("git push", out)
         self.assertEqual(self.leftovers(), [])
 
@@ -292,6 +292,39 @@ class RenameAndLinks(unittest.TestCase):
         self.assertFalse([p for p in problems if "renamed" in p or "kept" in p or "pinned" in p])
         # a draft does not count as live
         self.assertTrue(cli.links_that_would_break({"kept": {}}, [R("kept", {}, draft=True)], {}))
+
+    def test_removing_on_purpose_is_allowed_only_when_retired(self):
+        from shortlinks import auto_code
+
+        class R:
+            def __init__(self, slug, meta):
+                self.slug, self.metadata, self.draft = slug, meta, False
+
+        before = {"gone": {}, "kept": {}}
+        now = [R("kept", {})]
+        self.assertEqual(len(cli.links_that_would_break(before, now, {})), 2)  # address and short code
+        self.assertEqual(cli.links_that_would_break(before, now, {}, ({"gone"}, {auto_code("gone")})), [])
+        self.assertEqual(cli.links_that_would_break(before, now, {}, ({"gone"}, set())), [])  # retiring a slug retires its code too
+        self.assertEqual(len(cli.links_that_would_break(before, now, {}, (set(), {auto_code("gone")}))), 1)  # a code alone does not hide the address
+
+    def test_retired_file_is_read_and_validated(self):
+        import tempfile as tf
+
+        with tf.TemporaryDirectory() as d:
+            f = Path(d) / "retired.json"
+            self.assertEqual(cli.load_retired(f), (set(), set()))
+            f.write_text('{"artifacts": ["a"], "codes": ["abcd"]}')
+            self.assertEqual(cli.load_retired(f), ({"a"}, {"abcd"}))
+            f.write_text("[1, 2]")
+            with self.assertRaises(cli.ShelfError):
+                cli.load_retired(f)
+        self.assertEqual(cli.load_retired()[0], {"url-shortener"})  # this repo's own file
+
+    def test_prompt_full_includes_spec_and_metadata(self):
+        code, out, _ = run(self.artifacts, "prompt", "--full")
+        self.assertEqual(code, 0)
+        for needle in ("You are building one artifact", "## 1. Layout", "| `aliases` |"):
+            self.assertIn(needle, out)
 
     def test_list_json_and_validate(self):
         code, out, _ = run(self.artifacts, "list", "--json")

@@ -6,7 +6,7 @@ import { Featured } from "@/components/featured"
 import { Footer } from "@/components/footer"
 import { Header } from "@/components/header"
 import { Hero } from "@/components/hero"
-import { ProjectDialog } from "@/components/project-dialog"
+import { ArtifactDialog } from "@/components/artifact-dialog"
 import { useBrowse } from "@/hooks/use-browse"
 import { useDetailsRoute } from "@/hooks/use-details-route"
 import { useManifest } from "@/hooks/use-manifest"
@@ -59,10 +59,10 @@ export default function App() {
       <Header theme={theme} onToggleTheme={toggle} repo={repo} />
 
       <main id="main" tabIndex={-1} className="outline-none">
-        <Hero artifacts={state.status === "ready" ? all : null} generated={state.status === "ready" ? state.manifest.generated : undefined} />
+        <Hero />
 
         {state.status === "loading" && (
-          <section className="wrap pb-16" aria-busy="true" aria-label="Loading projects">
+          <section className="wrap pb-16" aria-busy="true" aria-label="Loading artifacts">
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -81,7 +81,7 @@ export default function App() {
         {state.status === "error" && (
           <section className="wrap pb-16">
             <div role="alert" className="rounded-lg border border-danger/50 p-6">
-              <p className="font-display text-lg font-semibold text-danger">The project list could not be loaded</p>
+              <p className="font-display text-lg font-semibold text-danger">The artifact list could not be loaded</p>
               <p className="mt-2 text-muted">
                 {state.message}. If you opened this file straight from disk, serve the folder over HTTP instead (for example{" "}
                 <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-sm">./shelf preview</code>).
@@ -115,13 +115,9 @@ export default function App() {
         )}
       </main>
 
-      <Footer
-        count={state.status === "ready" ? all.length : undefined}
-        generated={state.status === "ready" ? state.manifest.generated : undefined}
-        repo={repo}
-      />
+      <Footer />
 
-      <ProjectDialog active={details.active} onClose={details.close} onCloseFocus={details.restoreFocus} />
+      <ArtifactDialog active={details.active} onClose={details.close} onCloseFocus={details.restoreFocus} />
       <div className="sr-only-live" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>

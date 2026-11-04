@@ -71,7 +71,8 @@ class TestBuild(unittest.TestCase):
             self.assertEqual(rc, 0)
             data = json.loads((out / "artifacts.json").read_text())
             self.assertEqual([a["slug"] for a in data["artifacts"]], ["one"])
-            self.assertTrue((out / "artifacts" / "one" / "index.html").is_file())
+            self.assertIn("T one", (out / sl.auto_code("one") / "index.html").read_text())  # served at its short code
+            self.assertIn("../../" + sl.auto_code("one") + "/", (out / "artifacts" / "one" / "index.html").read_text())  # old address redirects
             self.assertFalse((out / "artifacts" / "draft-one").exists())
             self.assertTrue((out / ".nojekyll").exists())
 
@@ -171,8 +172,11 @@ class TestShortLinkBuild(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, out = self.build(d, {"docs": "https://example.com/docs"}, one=',"short":"first"')
             self.assertEqual(rc, 0)
-            self.assertIn("../artifacts/one/", (out / "first" / "index.html").read_text())
-            self.assertIn("../artifacts/two/", (out / sl.auto_code("two") / "index.html").read_text())
+            self.assertIn("T one", (out / "first" / "index.html").read_text())  # the artifact itself, not a redirect
+            self.assertNotIn("location.replace", (out / "first" / "index.html").read_text())
+            self.assertIn("T two", (out / sl.auto_code("two") / "index.html").read_text())
+            self.assertIn("../../first/", (out / "artifacts" / "one" / "index.html").read_text())
+            self.assertIn("../../" + sl.auto_code("two") + "/", (out / "artifacts" / "two" / "index.html").read_text())
             self.assertIn("https://example.com/docs", (out / "docs" / "index.html").read_text())
             self.assertFalse((out / "drafty").exists())  # drafts get no short link
             shorts = {a["slug"]: a["short"] for a in json.loads((out / "artifacts.json").read_text())["artifacts"]}
@@ -207,7 +211,7 @@ class TestPwa(unittest.TestCase):
             out = Path(d) / "site"
             self.assertEqual(build.main(["--artifacts-dir", str(root), "--out", str(out), "--skip-gallery", "--no-thumbnails"]), 0)
             self.assertEqual((root / "app-one" / "index.html").read_text(), before)
-            dest = out / "artifacts" / "app-one"
+            dest = out / sl.auto_code("app-one")
             for name in ("manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"):
                 self.assertTrue((dest / name).is_file(), name)
             html = (dest / "index.html").read_text()
@@ -223,17 +227,19 @@ class TestPwa(unittest.TestCase):
             self.assertIn('"manifest.webmanifest"', sw)
             self.assertNotIn('"sw.js"', sw)
             data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
-            self.assertEqual((data["install"], data["icon"], data["color"]), (True, "artifacts/app-one/icon-192.png", "#336699"))
+            self.assertEqual((data["install"], data["icon"], data["color"]), (True, sl.auto_code("app-one") + "/icon-192.png", "#336699"))
 
     def test_non_installable_artifact_only_gains_the_csp(self):
         with tempfile.TemporaryDirectory() as d:
             rc, root, out = self.built(d, "")
             self.assertEqual(rc, 0)
-            dest = out / "artifacts" / "app-one"
+            dest = out / sl.auto_code("app-one")
             served = (dest / "index.html").read_text()
             self.assertIn("Content-Security-Policy", served)
+            self.assertIn('property="og:title"', served)  # share tags are in the page crawlers fetch
             source = (root / "app-one" / "index.html").read_text()
-            self.assertEqual(served.replace(served[served.index("<meta http-equiv"):served.index(">", served.index("<meta http-equiv")) + 1], ""), source)
+            added = served[served.index("<head>") + 6 : served.index('<meta charset')]  # everything the build put at the top of <head>
+            self.assertEqual(served.replace(added, "", 1), source)
             self.assertNotIn("Content-Security-Policy", source)  # the source file is never changed
             self.assertEqual(sorted(p.name for p in dest.iterdir()), ["index.html"])
             data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]

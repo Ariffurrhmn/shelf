@@ -4,13 +4,15 @@
 Pipeline:
   1. validate every artifact (fails the build on errors)
   2. build the gallery UI (gallery/, Vite) into the output directory
-  3. copy published (non-draft) artifacts into <out>/artifacts/<slug>/, add a
+  3. copy published (non-draft) artifacts into <out>/<short-code>/ (so the shared
+     address is short), add a
      Content-Security-Policy that enforces each artifact's declared network
      (harden.py), and add PWA files to those with "install": true
   4. generate thumbnails (best effort, Playwright, cached by content hash)
-  5. write a redirect page per short link, with Open Graph tags, plus a redirect
-     for every alias (old slug) so renamed artifacts keep their links
-  6. write <out>/artifacts.json, robots.txt, sitemap.xml, .nojekyll and an optional CNAME
+  5. add Open Graph tags to each artifact page, write a redirect from artifacts/<slug>/
+     and from every alias (old slug) to the short address, and one for each links.json entry
+  6. write <out>/artifacts.json, shelf-spec.txt (the "Spec + prompt" button), robots.txt,
+     sitemap.xml, .nojekyll and an optional CNAME
 
 Usage:
     python tools/build/build.py
@@ -38,6 +40,7 @@ import shortlinks  # noqa: E402
 import harden  # noqa: E402
 import pwa  # noqa: E402
 import seo  # noqa: E402
+import specbundle  # noqa: E402
 
 DEFAULT_REPO_URL = "https://github.com/ariffurrhmn/shelf"
 THUMB_CACHE = Path(os.environ.get("SHELF_CACHE_DIR") or REPO / ".shelf-cache") / "thumbnails"
@@ -67,14 +70,14 @@ def make_entry(slug: str, meta: dict, thumb: dict | None, short: str | None = No
         "updated": meta.get("updated"),
         "source": meta.get("source"),
         "aliases": list(meta.get("aliases", [])),
-        "url": f"artifacts/{slug}/",
+        "url": f"{short}/" if short else f"artifacts/{slug}/",
         "short": short,
         "thumbnail": thumb["src"] if thumb else None,
         "thumbnailSmall": thumb["small"] if thumb else None,
         "thumbnailWidth": thumb["width"] if thumb else None,
         "thumbnailHeight": thumb["height"] if thumb else None,
         "install": install,
-        "icon": f"artifacts/{slug}/icon-192.png" if install else None,
+        "icon": f"{short}/icon-192.png" if install and short else (f"artifacts/{slug}/icon-192.png" if install else None),
         "color": (meta.get("color") or pwa.default_color(slug)) if install else None,
     }
     return entry
@@ -100,25 +103,14 @@ def build_manifest(
     return manifest
 
 
-def share_markup(r: sv.Result, entry: dict, base: str) -> str:
-    """Open Graph tags for one artifact's short-link page."""
-    image = entry["thumbnail"] or seo.SITE_IMAGE
-    code = entry["short"] or entry["slug"]
-    return seo.share_tags(
-        title=entry["title"],
-        description=entry["description"],
-        url=seo.absolute(base, code + "/"),
-        image=seo.absolute(base, image),
-    )
-
-
-def thumbnail_jobs(published: list[sv.Result]) -> dict:
+def thumbnail_jobs(published: list[sv.Result], codes: dict[str, str]) -> dict:
     hosts = list(sv.ALLOWED_CDN_HOSTS) + list(sv.ALLOWED_FONT_HOSTS)
     return {
         "cache": str(THUMB_CACHE),
         "items": [
             {
                 "slug": r.slug,
+                "path": codes[r.slug],
                 "override": (r.metadata or {}).get("thumbnail"),
                 "allowHosts": hosts + list((r.metadata or {}).get("network", [])),
             }
@@ -182,20 +174,23 @@ def main(argv: list[str] | None = None) -> int:
             shutil.rmtree(out)
         out.mkdir(parents=True)
 
-    # 3. artifacts
-    dest_root = out / "artifacts"
-    if dest_root.exists():
-        shutil.rmtree(dest_root)
+    # 3. artifacts: each is served at /<code>/ (short, no redirect); artifacts/<slug>/ redirects to it
+    codes = plan.artifacts
+    taken = [f"{codes[r.slug]!r} ({r.slug})" for r in published if (out / codes[r.slug]).exists()]
+    if taken:
+        print(f"\nBuild stopped: short code(s) {', '.join(taken)} collide with files the gallery build wrote. Set a different \"short\".", file=sys.stderr)
+        return 1
+    shutil.rmtree(out / "artifacts", ignore_errors=True)
     for r in published:
-        shutil.copytree(r.path, dest_root / r.slug, ignore=shutil.ignore_patterns(".*", "__pycache__"))
-    print(f"Copied {len(published)} artifact(s) to {dest_root}")
+        shutil.copytree(r.path, out / codes[r.slug], ignore=shutil.ignore_patterns(".*", "__pycache__"))
+    print(f"Copied {len(published)} artifact(s) to {out} (one folder per short code)")
     for r in published:
-        harden.harden_artifact(dest_root / r.slug, r.metadata)
+        harden.harden_artifact(out / codes[r.slug], r.metadata)
     print(f"Added a Content-Security-Policy to {len(published)} artifact(s)")
     installable = [r for r in published if r.metadata and r.metadata.get("install") is True]
     for r in installable:
         try:
-            pwa.make_installable(dest_root / r.slug, r.slug, r.metadata)
+            pwa.make_installable(out / codes[r.slug], r.slug, r.metadata)
         except pwa.PwaError as exc:
             print(f"\nBuild stopped: {r.slug} cannot be made installable: {exc}", file=sys.stderr)
             return 1
@@ -209,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.install and not (build_tools / "node_modules").exists():
             run(["npm", "ci"], build_tools)
         jobs_file = out / ".thumbnail-jobs.json"
-        jobs_file.write_text(json.dumps(thumbnail_jobs(published)), encoding="utf-8")
+        jobs_file.write_text(json.dumps(thumbnail_jobs(published, codes)), encoding="utf-8")
         try:
             rc = run(["node", "thumbnails.cjs", str(out), str(jobs_file)], build_tools, check=False)
         finally:
@@ -221,23 +216,35 @@ def main(argv: list[str] | None = None) -> int:
             thumbs = json.loads(index.read_text(encoding="utf-8"))
             index.unlink()
 
-    # 5. manifest, short links and aliases (after the gallery build, which empties the output folder)
+    # 5. manifest, share tags, redirects (after the gallery build, which empties the output folder)
     base = shortlinks.base_url()
     site_base = base or shortlinks.DEFAULT_BASE_URL
     gh = os.environ.get("GITHUB_REPOSITORY")
     repo_url = f"https://github.com/{gh}" if gh else DEFAULT_REPO_URL
     manifest = build_manifest(published, thumbs, repo_url, plan.artifacts)
     entries = {e["slug"]: e for e in manifest["artifacts"]}
-    share = {r.slug: share_markup(r, entries[r.slug], site_base) for r in published if r.slug in entries}
+    for r in published:  # the shared address is the artifact itself, so its tags go in its own <head>
+        e = entries[r.slug]
+        page = out / codes[r.slug] / "index.html"
+        tags = seo.artifact_head_tags(
+            page.read_text(encoding="utf-8"),
+            title=e["title"],
+            description=e["description"],
+            url=seo.absolute(site_base, e["url"]),
+            image=seo.absolute(site_base, e["thumbnail"] or seo.SITE_IMAGE),
+        )
+        if tags:
+            page.write_text(harden.insert_in_head(page.read_text(encoding="utf-8"), tags), encoding="utf-8")
     try:
-        count = shortlinks.write_redirects(out, plan, share)
-        alias_map = {alias: e["slug"] for e in manifest["artifacts"] for alias in e["aliases"]}
-        n_alias = shortlinks.write_alias_redirects(out, alias_map)
+        count = shortlinks.write_redirects(out, plan)
+        old_addresses = {e["slug"]: e["short"] for e in entries.values()}
+        old_addresses.update({alias: e["short"] for e in entries.values() for alias in e["aliases"]})
+        n_alias = shortlinks.write_alias_redirects(out, old_addresses)
     except shortlinks.ShortLinkError as exc:
         print("\n".join(f"error: {p}" for p in exc.problems), file=sys.stderr)
         return 1
     rows = shortlinks.describe(plan, {r.slug: r.metadata["title"] for r in published}, base)
-    print(f"\nWrote {count} short link(s) and {n_alias} alias redirect(s):\n{shortlinks.format_table(rows)}")
+    print(f"\nShort links ({len(plan.artifacts)} artifact(s), {count} extra link(s), {n_alias} old-address redirect(s)):\n{shortlinks.format_table(rows)}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary and rows:
         with open(summary, "a", encoding="utf-8") as fh:
@@ -247,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     (out / "artifacts.json").write_text(text, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
+    bundle = specbundle.bundle()
+    (out / "shelf-spec.txt").write_text(bundle, encoding="utf-8")
     (out / "robots.txt").write_text(seo.robots_txt(site_base), encoding="utf-8")
     (out / "sitemap.xml").write_text(seo.sitemap_xml(site_base, manifest["artifacts"]), encoding="utf-8")
     for name in ("index.html", "404.html"):
@@ -260,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         (out / "CNAME").write_text(os.environ["SHELF_CNAME"].strip() + "\n", encoding="utf-8")
     if (gallery / "public").is_dir():  # lets `npm run dev` show real data
         (gallery / "public" / "artifacts.json").write_text(text, encoding="utf-8")
+        (gallery / "public" / "shelf-spec.txt").write_text(bundle, encoding="utf-8")
 
     print(f"\nBuilt {len(manifest['artifacts'])} artifact(s) into {out}")
     return 0

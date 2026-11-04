@@ -120,3 +120,26 @@ A running log of design decisions for Shelf, newest at the bottom. Each entry sa
 
 - **Status:** decided
 - Crawlers ignore client-side meta changes, so the gallery has one high-quality site-level card, and each artifact's short-link page (plain HTML) carries its own Open Graph/Twitter tags with the thumbnail. Share short links for rich previews. The in-gallery `#slug` view cannot have its own preview.
+
+## Artifacts live at their short address
+
+- **Status:** decided (replaces "a redirect page per code" for artifacts)
+- Each artifact is built into `site/<code>/` and served there directly; `artifacts/<slug>/` and every alias are redirects to it. Links from the gallery, the copied link and the address bar are all the short form. `links.json` entries are still redirects.
+- **Why:** a redirect leaves the long address in the address bar, and a link such as `/shelf/74ng#4` should *be* the address. Static hosting cannot rewrite URLs, so the folder itself has to be the short name.
+- **Trade-offs:** the code is now the folder name, so the code is part of an installed app's scope; renaming an artifact pins the old code (`short`), which `shelf rename` already did. Anyone who installed an app from the old long address would have to reinstall. `base-path + 4 characters` is as short as GitHub Pages allows; a shorter host needs `SHELF_CNAME`.
+
+## Intentional removals: retired.json
+
+- **Status:** decided
+- The permanent-link check fails when a published address or short code disappears. `retired.json` (`{"artifacts": [...], "codes": [...]}`) lists what was removed on purpose; retiring a slug also retires its short code.
+- **Why:** removing something should be a visible, reviewed decision in the diff, not a silent break and not an escape flag in CI.
+
+## "Spec + prompt" button
+
+- **Status:** decided
+- The build writes `shelf-spec.txt` (prompt block + SPEC + METADATA) from `spec/`, and the button copies it with a clipboard write that receives a promise, so it works inside the click gesture on Safari too. `shelf prompt --full` prints the same text. Nothing is duplicated by hand, so it cannot drift.
+
+## Wording and a quieter first screen
+
+- **Status:** decided
+- The gallery says "artifact" everywhere (the repo's own word); the hero's statistics line and the footer's count/date line were removed. Result counts (for example "3 of 4 artifacts match") stay because they are feedback for search and filters.

@@ -6,7 +6,7 @@ The words MUST, MUST NOT, and SHOULD are used in their usual sense: MUST rules f
 
 ## 1. Layout
 
-- An artifact is a folder `artifacts/<slug>/`.
+- An artifact is a folder `artifacts/<slug>/` in the repository. On the built site it is served at its short address `/<code>/` (see METADATA.md, Short links), so it must not assume its own URL path.
 - The entry point is `artifacts/<slug>/index.html`. It MUST exist.
 - A single self-contained file is preferred.
 - Extra local assets (images, fonts, scripts, stylesheets) MAY live in the same folder and MUST be referenced by relative path. Nothing outside the artifact folder may be referenced.
@@ -106,7 +106,7 @@ Artifacts are arbitrary JavaScript, often written by an AI. Validation reads the
 
 ## 12. Links that never break
 
-- The slug is the permanent address: `artifacts/<slug>/`. Renaming with `shelf rename` keeps the old address working through `aliases` (section 3) and pins the old short code in `short`.
+- The permanent addresses are the short code (`/<code>/`) and the slug (`artifacts/<slug>/`, which redirects to the short address). Renaming with `shelf rename` keeps the old address working through `aliases` (section 3) and pins the old short code in `short`.
 - Slugs and aliases share one namespace; the validator fails on any repeat.
 - `shelf links --compare origin/main` (run by CI) fails when an address or short code that was public on `main` would stop working.
 

@@ -103,8 +103,10 @@ class TestBuildOutputs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, out = self.build(d, ',"aliases":["old-name"]')
             self.assertEqual(rc, 0)
+            code = sl.auto_code("new-name")
             page = (out / "artifacts" / "old-name" / "index.html").read_text()
-            self.assertIn('"../new-name/"', page)
+            self.assertIn(f'"../../{code}/"', page)
+            self.assertIn(f'"../../{code}/"', (out / "artifacts" / "new-name" / "index.html").read_text())
             self.assertIn("location.search + location.hash", page)
             data = json.loads((out / "artifacts.json").read_text())["artifacts"][0]
             self.assertEqual(data["aliases"], ["old-name"])
@@ -118,17 +120,30 @@ class TestBuildOutputs(unittest.TestCase):
                              "--links", str(Path(d) / "none.json")])
             self.assertEqual(rc, 1)
 
-    def test_short_link_pages_are_share_cards_and_seo_files_exist(self):
+    def test_artifact_page_is_the_share_card_and_seo_files_exist(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out = self.build(d)
             self.assertEqual(rc, 0)
             code = sl.auto_code("new-name")
-            page = (out / code / "index.html").read_text()
+            page = (out / code / "index.html").read_text()  # served directly at its short address
             self.assertIn('property="og:title" content="T new-name"', page)
             self.assertIn('property="og:image" content="https://ariffurrhmn.github.io/shelf/og.png"', page)
             self.assertIn(f'property="og:url" content="https://ariffurrhmn.github.io/shelf/{code}/"', page)
-            self.assertIn("artifacts/new-name/", (out / "sitemap.xml").read_text())
+            self.assertIn(f'<link rel="canonical" href="https://ariffurrhmn.github.io/shelf/{code}/">', page)
+            self.assertLess(page.index("Content-Security-Policy"), page.index("<script"))
+            self.assertIn(f"{code}/", (out / "sitemap.xml").read_text())
             self.assertIn("Sitemap:", (out / "robots.txt").read_text())
+
+    def test_authors_own_share_tags_are_left_alone(self):
+        html = '<html><head><meta property="og:title" content="Mine"></head></html>'
+        self.assertEqual(seo.artifact_head_tags(html, title="T", description="d", url="https://e/x/", image="https://e/i.png"), "")
+
+    def test_spec_bundle_is_written_and_complete(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, out = self.build(d)
+            text = (out / "shelf-spec.txt").read_text()
+            for needle in ("You are building one artifact", "## 1. Layout", "| `featured` |", "Part 1", "Part 3"):
+                self.assertIn(needle, text)
 
     def test_thumbnail_jobs_include_override_and_declared_hosts(self):
         with tempfile.TemporaryDirectory() as d:
@@ -136,8 +151,8 @@ class TestBuildOutputs(unittest.TestCase):
             artifact(root, "a", ',"thumbnail":"cover.png","network":["api.example.com"]')
             (root / "a" / "cover.png").write_bytes(b"\x89PNG")
             results = build.sv.validate_all(root)
-            job = build.thumbnail_jobs(results)["items"][0]
-            self.assertEqual(job["override"], "cover.png")
+            job = build.thumbnail_jobs(results, {"a": "abcd"})["items"][0]
+            self.assertEqual((job["override"], job["path"]), ("cover.png", "abcd"))
             self.assertIn("api.example.com", job["allowHosts"])
             self.assertIn("cdn.jsdelivr.net", job["allowHosts"])
 

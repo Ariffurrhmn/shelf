@@ -35,4 +35,4 @@ All visual decisions are CSS variables in `src/index.css`: colour roles (`--bg`,
 
 - **Links:** the details dialog is addressed by `#slug` and is a real history entry; old slugs listed in an artifact's `aliases` open the same dialog. Filters are `?q=&kind=&tag=&installable=1&sort=` and use `replaceState`, so they are shareable but do not fill the Back button.
 - **Preferences:** theme and sort are remembered in `localStorage` (wrapped in try/catch). Filters are never remembered.
-- **Featured:** shown above the grid only while nothing is filtered and only if some, but not all, projects set `featured`.
+- **Featured:** shown above the grid only while nothing is filtered and only if some, but not all, artifacts set `featured`.

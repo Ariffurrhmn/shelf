@@ -8,7 +8,7 @@
     shelf rename OLD NEW             rename an artifact without breaking its links
     shelf links [--compare REF]      show short links; check none disappeared since REF
     shelf doctor                     check the local setup
-    shelf prompt                     print the instructions to give an AI assistant
+    shelf prompt [--full]            print the instructions to give an AI assistant
 
 Nothing here pushes to GitHub or deploys. Publishing is a git push you do yourself.
 """
@@ -37,6 +37,7 @@ sys.path.insert(0, str(REPO / "tools" / "validate"))
 sys.path.insert(0, str(REPO / "tools" / "build"))
 import shelf_validate as sv  # noqa: E402
 import shortlinks  # noqa: E402
+import specbundle  # noqa: E402
 
 ARTIFACTS = REPO / "artifacts"
 MAX_SOURCE_BYTES = 5_000_000
@@ -387,8 +388,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 
     rel = dest.relative_to(REPO) if dest.is_relative_to(REPO) else dest
     print(f"\nAdded {rel}/index.html")
-    print(f"  short link:  {base_url}{short}  (after publishing)")
-    print(f"  full link:   {base_url}artifacts/{slug}/")
+    print(f"  link:        {base_url}{short}  (after publishing; add #3 to open slide 3 of a deck)")
     print("  thumbnail:   " + ("your image" if args.thumbnail else "generated automatically by the build (cached)"))
     print("\nNext steps")
     print(f"  1. python shelf preview {slug}     # look at it in the full gallery")
@@ -518,8 +518,30 @@ def published_at(ref: str) -> dict[str, dict]:
     return out
 
 
-def links_that_would_break(before: dict[str, dict], results: list[sv.Result], extra_links: dict[str, str]) -> list[str]:
-    """Addresses and short codes published in `before` that no longer resolve now."""
+RETIRED_FILE = REPO / "retired.json"
+
+
+def load_retired(path: Path = RETIRED_FILE) -> tuple[set[str], set[str]]:
+    """(artifact slugs, short codes) that were removed on purpose. A missing file means none."""
+    if not path.is_file():
+        return set(), set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return set(data.get("artifacts", [])), set(data.get("codes", []))
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        raise ShelfError(f"{path.name} must look like {{\"artifacts\": [\"old-slug\"], \"codes\": [\"abcd\"]}}.") from None
+
+
+def links_that_would_break(
+    before: dict[str, dict],
+    results: list[sv.Result],
+    extra_links: dict[str, str],
+    retired: tuple[set[str], set[str]] = (set(), set()),
+) -> list[str]:
+    """Addresses and short codes published in `before` that no longer resolve now.
+
+    Things listed in retired.json were removed on purpose and are not reported."""
+    retired_slugs, retired_codes = retired
     live_names, live_codes = set(), set(extra_links)
     for r in results:
         if r.draft or r.metadata is None:
@@ -529,11 +551,13 @@ def links_that_would_break(before: dict[str, dict], results: list[sv.Result], ex
         live_codes.add(r.metadata.get("short") or shortlinks.auto_code(r.slug))
     problems = []
     for slug, meta in sorted(before.items()):
+        if slug in retired_slugs:
+            continue
         if slug not in live_names:
-            problems.append(f"artifacts/{slug}/ was published but is gone. Add it to the `aliases` of the artifact that replaced it (shelf rename does this), or remove it on purpose.")
+            problems.append(f"artifacts/{slug}/ was published but is gone. Add it to the `aliases` of the artifact that replaced it (shelf rename does this), or list it in retired.json if you removed it on purpose.")
         code = meta.get("short") or shortlinks.auto_code(slug)
-        if code not in live_codes:
-            problems.append(f"short link /{code} (from {slug!r}) no longer exists. Set \"short\": \"{code}\" on the artifact that replaced it.")
+        if code not in live_codes and code not in retired_codes:
+            problems.append(f"short link /{code} (from {slug!r}) no longer exists. Set \"short\": \"{code}\" on the artifact that replaced it, or list it in retired.json if you removed it on purpose.")
     return problems
 
 
@@ -548,7 +572,7 @@ def cmd_links(args: argparse.Namespace) -> int:
     titles = {r.slug: (r.metadata or {}).get("title", r.slug) for r in results}
     print(shortlinks.format_table(shortlinks.describe(plan, titles, base)))
     if args.compare:
-        problems = links_that_would_break(published_at(args.compare), results, extra)
+        problems = links_that_would_break(published_at(args.compare), results, extra, load_retired())
         if problems:
             print(f"\nPermanent links that would break compared with {args.compare}:", file=sys.stderr)
             for pr in problems:
@@ -636,6 +660,14 @@ def _site_is_stale(site: Path, artifacts: Path) -> bool:
     return newest > built
 
 
+def _code_for(artifacts: Path, slug: str) -> str:
+    """The short code an artifact is served at (its own `short`, or the automatic one)."""
+    result = sv.validate_artifact(safe_child(artifacts, slug))
+    if result.draft:
+        raise ShelfError(f"{slug} is a draft: it is not part of the built site. Use --raw to preview it.")
+    return (result.metadata or {}).get("short") or shortlinks.auto_code(slug)
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     artifacts = Path(args.artifacts_dir)
     prefix = ("/" + args.base.strip("/")) if args.base.strip("/") else ""
@@ -654,7 +686,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
             if subprocess.run(cmd, cwd=REPO).returncode != 0:
                 raise ShelfError("The build failed; see the errors above.")
         root = site
-        path = f"/artifacts/{args.slug}/" if args.slug else "/"
+        path = f"/{_code_for(artifacts, args.slug)}/" if args.slug else "/"
     try:
         server = serve_directory(root, args.port, prefix)
     except OSError as exc:
@@ -732,15 +764,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def prompt_text() -> str:
-    text = (REPO / "spec" / "PROMPT.md").read_text(encoding="utf-8")
-    m = re.search(r"````text\n(.*?)\n````", text, re.S)
-    if not m:
-        raise ShelfError("spec/PROMPT.md has no ````text block.")
-    return m.group(1)
+    try:
+        return specbundle.prompt_block(REPO / "spec")
+    except ValueError as exc:
+        raise ShelfError(str(exc)) from None
 
 
 def cmd_prompt(args: argparse.Namespace) -> int:
-    print(prompt_text())
+    print(specbundle.bundle(REPO / "spec") if args.full else prompt_text())
     return 0
 
 
@@ -812,7 +843,9 @@ def build_parser() -> argparse.ArgumentParser:
     lk.set_defaults(func=cmd_links)
 
     sub.add_parser("doctor", help="check the local setup").set_defaults(func=cmd_doctor)
-    sub.add_parser("prompt", help="print the instructions to give an AI assistant").set_defaults(func=cmd_prompt)
+    pr = sub.add_parser("prompt", help="print the instructions to give an AI assistant")
+    pr.add_argument("--full", action="store_true", help="also include the full spec and metadata reference (what the site's Spec + prompt button copies)")
+    pr.set_defaults(func=cmd_prompt)
     return ap
 
 

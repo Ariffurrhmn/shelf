@@ -3,10 +3,10 @@
  *
  * Usage: node thumbnails.cjs <site-dir> <jobs.json>
  *
- * jobs.json: { "cache": "<dir>", "items": [ { "slug": "...", "override": "cover.png" | null,
+ * jobs.json: { "cache": "<dir>", "items": [ { "slug": "...", "path": "74ng" (folder under site/), "override": "cover.png" | null,
  *                                              "allowHosts": ["cdn.jsdelivr.net", ...] } ] }
  *
- * Reads   <site-dir>/artifacts/<slug>/            (the already-built copy)
+ * Reads   <site-dir>/<path>/                      (the already-built copy; default artifacts/<slug>)
  * Writes  <site-dir>/thumbnails/<slug>-<hash>.webp          1280x800
  *         <site-dir>/thumbnails/<slug>-<hash>-640.webp       640x400
  *         <site-dir>/thumbnails/index.json                   { slug: { src, small, width, height } }
@@ -152,7 +152,8 @@ async function main() {
     await helper.goto("about:blank")
     for (const item of jobs.items) {
       const { slug, override } = item
-      const dir = path.join(site, "artifacts", slug)
+      const rel = item.path || `artifacts/${slug}`
+      const dir = path.join(site, rel)
       try {
         const hash = hashFolder(dir, String(override))
         const names = { src: `${slug}-${hash}.webp`, small: `${slug}-${hash}-640.webp` }
@@ -191,7 +192,7 @@ async function main() {
               context.on("page", async (p) => {
                 if (await p.opener().catch(() => null)) await p.close().catch(() => {}) // close popups only
               })
-              png = await screenshot(context, `${server.url}artifacts/${slug}/`)
+              png = await screenshot(context, `${server.url}${rel}/`)
             } finally {
               await context.close()
             }

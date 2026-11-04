@@ -7,7 +7,7 @@ You are building one artifact for my personal gallery, Shelf. Follow these rules
 
 OUTPUT
 - Reply with ONE complete file: index.html. No other files unless I ask. No build step, no npm, no bundler.
-- Everything inline (HTML, CSS, JS) in that single file. It must work when opened directly from a static web server at a path like /artifacts/<slug>/ (so use only relative URLs for any local file, never absolute paths like /logo.png).
+- Everything inline (HTML, CSS, JS) in that single file. It is served from a static web server inside its own folder, so use only relative URLs for any local file, never absolute paths like /logo.png.
 
 METADATA
 - In <head>, include a JSON block: <script type="application/json" id="shelf-meta"> ... </script>

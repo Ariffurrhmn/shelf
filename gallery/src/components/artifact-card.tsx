@@ -13,18 +13,18 @@ interface Props {
   onDetails: (a: Artifact) => void
   /** Larger type, used in the Featured strip. */
   feature?: boolean
-  /** Image beside the text on wide screens (a lone featured project). */
+  /** Image beside the text on wide screens (a lone featured artifact). */
   wide?: boolean
   /** Load the screenshot immediately (above the fold). */
   eager?: boolean
 }
 
 /**
- * One project. The title is the single link to the project and is stretched over the whole card,
+ * One artifact. The title is the single link to it and is stretched over the whole card,
  * so the card is one big, obvious target; the action buttons sit above that layer. There are no
  * nested interactive elements and the tab order is: title, Open, Details, Copy link (the first two go to the same place).
  */
-export function ProjectCard({ artifact, onDetails, feature = false, wide = false, eager = false }: Props) {
+export function ArtifactCard({ artifact, onDetails, feature = false, wide = false, eager = false }: Props) {
   const { copied, copy } = useCopy()
   const kind = KIND_META[artifact.kind]
   const KindIcon = kind.icon
@@ -74,7 +74,7 @@ export function ProjectCard({ artifact, onDetails, feature = false, wide = false
 
         <div className="above mt-1 flex items-center gap-2">
           <a href={artifact.url} className="btn btn-primary flex-1" aria-label={`Open ${artifact.title}`}>
-            Open project <ArrowUpRight aria-hidden />
+            Open artifact <ArrowUpRight aria-hidden />
           </a>
           <button type="button" className="btn btn-secondary" onClick={() => onDetails(artifact)} aria-label={`Details for ${artifact.title}`}>
             <Info aria-hidden /> <span>Details</span>

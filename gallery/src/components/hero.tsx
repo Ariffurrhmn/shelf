@@ -1,24 +1,9 @@
 import { ArrowDown } from "lucide-react"
 
 import { jumpTo } from "@/components/header"
-import { formatDate, plural } from "@/lib/format"
-import type { Artifact } from "@/types"
+import { SpecButton } from "@/components/spec-button"
 
-/** Numbers come from the loaded manifest only; nothing here is hard-coded. */
-function Stats({ artifacts, generated }: { artifacts: Artifact[]; generated: string }) {
-  const kinds = new Set(artifacts.map((a) => a.kind)).size
-  const installable = artifacts.filter((a) => a.install).length
-  const day = generated.slice(0, 10)
-  const parts = [
-    plural(artifacts.length, "project"),
-    plural(kinds, "category", "categories"),
-    installable > 0 ? `${installable} installable` : null,
-    /^\d{4}-\d{2}-\d{2}$/.test(day) ? `updated ${formatDate(day)}` : null,
-  ].filter(Boolean)
-  return <p className="mono-meta">{parts.join("  ·  ")}</p>
-}
-
-export function Hero({ artifacts, generated }: { artifacts: Artifact[] | null; generated?: string }) {
+export function Hero() {
   return (
     <section className="wrap pt-12 pb-10 sm:pt-20 sm:pb-14" aria-labelledby="hero-title">
       <p className="eyebrow">A personal digital playground</p>
@@ -28,7 +13,7 @@ export function Hero({ artifacts, generated }: { artifacts: Artifact[] | null; g
       <p className="mt-5 max-w-xl text-lg text-muted">
         A growing collection of little apps, creative experiments, and interactive ideas — built, collected, and shared.
       </p>
-      <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
         <a
           href="#explore"
           onClick={(e) => {
@@ -39,7 +24,7 @@ export function Hero({ artifacts, generated }: { artifacts: Artifact[] | null; g
         >
           Explore the collection <ArrowDown aria-hidden />
         </a>
-        <div className="min-h-5">{artifacts && generated && artifacts.length > 0 && <Stats artifacts={artifacts} generated={generated} />}</div>
+        <SpecButton className="btn btn-secondary" />
       </div>
     </section>
   )

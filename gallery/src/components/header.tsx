@@ -1,6 +1,7 @@
 import { ArrowUpRight, Moon, Sun } from "lucide-react"
 
 import { Logo } from "@/components/logo"
+import { SpecButton } from "@/components/spec-button"
 
 interface Props {
   theme: "light" | "dark"
@@ -8,7 +9,7 @@ interface Props {
   repo?: string
 }
 
-/** Scrolls to a section and moves focus there, without touching the URL hash (which is used for project links). */
+/** Scrolls to a section and moves focus there, without touching the URL hash (which is used for artifact links). */
 export function jumpTo(id: string) {
   const el = document.getElementById(id)
   if (!el) return
@@ -45,8 +46,9 @@ export function Header({ theme, onToggleTheme, repo }: Props) {
           >
             Explore
           </a>
+          <SpecButton className="btn btn-ghost px-3" />
           {repo && (
-            <a href={repo} className="btn btn-ghost px-3" rel="noopener noreferrer">
+            <a href={repo} className="btn btn-ghost hidden px-3 sm:inline-flex" rel="noopener noreferrer">
               Source <ArrowUpRight aria-hidden />
             </a>
           )}

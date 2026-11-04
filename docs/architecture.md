@@ -23,8 +23,9 @@ flowchart LR
 | Validator | `tools/validate/shelf_validate.py` | Checks one or all artifacts, plus slug/alias collisions. Exit code 1 on errors. |
 | Build script | `tools/build/build.py` | Orchestrates the build (below). |
 | Hardening | `tools/build/harden.py` | Injects a Content-Security-Policy that enforces each artifact's declared network. |
+| Spec bundle | `tools/build/specbundle.py` | Builds `shelf-spec.txt` (prompt + spec + metadata reference) for the "Spec + prompt" button. |
 | SEO | `tools/build/seo.py` | `robots.txt`, `sitemap.xml`, Open Graph/Twitter tags, canonical URLs, gallery CSP. |
-| Short links | `tools/build/shortlinks.py` | Picks a short code per artifact, reads `links.json`, writes redirect pages (with share tags) and alias redirects. |
+| Short links | `tools/build/shortlinks.py` | Picks a short code per artifact, reads `links.json`, writes redirect pages for `links.json` entries and for every older address. |
 | Thumbnails | `tools/build/thumbnails.cjs` | Captures 1280×800 and 640×400 WebP per artifact in a request-allowlisted headless browser, cached by content hash. |
 | PWA step | `tools/build/pwa.py` | For `install: true`: manifest, icons, service worker, injected tags. |
 | Gallery | `gallery/` | Vite + React + Tailwind v4. Reads `artifacts.json`. See `gallery/README.md`. |
@@ -54,10 +55,12 @@ site/
 ├── index.html, assets/, favicon.svg, og.png, 404.html    gallery
 ├── artifacts.json           manifest the gallery reads
 ├── robots.txt, sitemap.xml
-├── artifacts/<slug>/        copied artifact folders (drafts excluded), with a CSP tag
+├── <code>/                  each artifact itself, at its 4-character short code (drafts excluded),
+│   │                        with a CSP tag and Open Graph tags in its <head>
 │   └── manifest.webmanifest, icon-*.png, sw.js   only when install: true
-├── artifacts/<old-slug>/    redirect page for every alias
-├── <code>/index.html        one redirect + share-card page per short link
+├── artifacts/<slug>/        redirect to <code>/ for the slug and for every alias (old slug)
+├── <code>/index.html        (links.json entries only) a redirect to the target address
+├── shelf-spec.txt           the text behind the "Spec + prompt" button
 ├── thumbnails/<slug>-<hash>.webp, …-640.webp
 └── .nojekyll, CNAME?
 ```
@@ -68,10 +71,12 @@ site/
 
 ## Short links
 
-Static hosting cannot answer a request with a redirect, so each short link is a folder with a tiny `index.html`. It sends the visitor on with JavaScript (carrying `?query` and `#hash`, so `/pdhh#4` opens slide 4) and has a `<meta http-equiv="refresh">` inside `<noscript>` as a fallback. The page also carries Open Graph and Twitter tags for its artifact (crawlers do not run JavaScript, so this is how a shared short link gets a title, description and thumbnail card). Targets of artifact links are relative (`../artifacts/<slug>/`), so they work from any host or sub-path. The page is served as `/<code>/` after the host adds the slash, and the script also works if the host serves it at `/<code>`.
+Static hosting cannot answer a request with a redirect, so Shelf avoids needing one: **the artifact is served directly at its short address** (`/<code>/`, 4 characters by default). The address bar stays short, a hash such as `/pdhh/#4` opens slide 4 with no forwarding, and the page's own `<head>` carries the canonical URL and Open Graph/Twitter tags (crawlers do not run JavaScript, so the tags must be in the served HTML).
 
-The plan is made right after validation and before the slow gallery build, so a code clash fails the build in seconds. The redirect pages are written after the gallery build, which empties `site/`.
-`
+The long address `artifacts/<slug>/`, and every earlier slug in `aliases`, is a tiny redirect page to `../../<code>/` (JavaScript, carrying `?query` and `#hash`, with `<meta http-equiv="refresh">` in `<noscript>` as a fallback). So every link ever published keeps working. Entries in `links.json` are redirect pages to any `http(s)` address, which makes Shelf a general URL shortener.
+
+The plan is made right after validation and before the slow gallery build, so a code clash fails the build in seconds. Artifacts are copied and redirects are written after the gallery build, which empties `site/`. Installed apps are scoped to their short folder, so a code that changes would orphan an installed copy: that is one more reason codes are never renumbered.
+
 ## Boundaries
 
 - Artifacts are served as they are, except the CSP tag, and the PWA files and tags when `install: true`. The gallery links to them; it does not embed them (see [security.md](security.md)).
