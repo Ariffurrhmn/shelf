@@ -18,7 +18,7 @@ node scripts/check-contrast.mjs   # WCAG 2.2 AA check of the colour tokens
 ```text
 src/
 ├── App.tsx                  page composition, "/" shortcut, loading and error states
-├── components/              header, hero, featured, explore (search + filters + grid),
+├── components/              header, featured, explore (search + filters + grid),
 │                            project-card, project-dialog, thumb, footer
 ├── hooks/                   use-manifest, use-browse (filters in the URL, sort preference),
 │                            use-details-route (dialog as a history entry), use-copy, use-theme

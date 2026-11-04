@@ -27,7 +27,7 @@ It is a personal project, built for one author. It is not a platform: no account
 - **Fast discovery.** Search (press `/`), category, tag and "installable" filters, four sort orders, shareable filtered URLs.
 - **Publishing in one command.** `python shelf add my-app.html` validates, names, files and describes an artifact, with nothing half-written if it fails.
 - **Short, permanent links.** Every artifact lives at a 4-character address like `…/shelf/74ng` (add `#3` for slide 3). Renamed artifacts keep their old addresses, and a CI check fails if a published link would stop working.
-- **A one-click brief for any AI.** The **Spec + prompt** button copies the prompt, the full spec and the metadata reference, ready to paste into Claude or ChatGPT.
+- **A one-click brief for any AI.** The **Spec + prompt** button in the header copies the prompt, the full spec and the metadata reference, ready to paste into Claude or ChatGPT.
 - **Sharing that looks right.** Open Graph and Twitter cards on every artifact address, a social preview image, sitemap and robots.
 - **Installable apps.** Mark an artifact `install: true` and it becomes an offline app on desktop or phone.
 - **Safer by default.** A browser-enforced network policy per artifact, secret scanning, request-limited screenshots, least-privilege CI. See [Security](#security-and-its-limits) for what is *not* covered.

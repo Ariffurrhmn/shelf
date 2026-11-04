@@ -36,16 +36,6 @@ export function Header({ theme, onToggleTheme, repo }: Props) {
           <span>Shelf</span>
         </a>
         <nav aria-label="Primary" className="ml-auto flex items-center gap-0.5 sm:gap-1">
-          <a
-            href="#explore"
-            onClick={(e) => {
-              e.preventDefault()
-              jumpTo("explore")
-            }}
-            className="btn btn-ghost hidden px-3 sm:inline-flex"
-          >
-            Explore
-          </a>
           <SpecButton className="btn btn-ghost px-3" />
           {repo && (
             <a href={repo} className="btn btn-ghost hidden px-3 sm:inline-flex" rel="noopener noreferrer">

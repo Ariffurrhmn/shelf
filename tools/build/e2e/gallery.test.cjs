@@ -80,9 +80,18 @@ const waitCards = (page, n) => page.waitForFunction((n) => document.querySelecto
 const titles = (page) => page.locator("article h3").allTextContents()
 
 describe("homepage", () => {
-  test("renders the hero and one card per artifact, without stats lines, with no console errors", async () => {
+  test("opens straight on the collection: no hero, no stats lines, one card per artifact, no console errors", async () => {
     const { page, context, problems } = await open(real)
-    assert.equal(await page.getByRole("heading", { level: 1 }).innerText(), "Small experiments. Useful creations.")
+    assert.equal(await page.getByRole("heading", { level: 1 }).innerText(), "Shelf: small experiments, useful creations")
+    // the h1 and the "Explore Shelf" heading exist for screen readers only
+    for (const name of ["Shelf: small experiments, useful creations", "Explore Shelf"]) {
+      const box = await page.getByRole("heading", { name }).boundingBox()
+      assert.ok(box.width <= 2 && box.height <= 2, `${name} is visually hidden`)
+    }
+    assert.equal(await page.getByText("A personal digital playground").count(), 0)
+    assert.equal(await page.getByRole("link", { name: "Explore the collection" }).count(), 0)
+    const firstCard = await page.locator("article").first().boundingBox()
+    assert.ok(firstCard.y < 500, `the first card starts high on the page (y=${Math.round(firstCard.y)})`)
     assert.doesNotMatch(await page.locator("body").innerText(), /\d+ categories|built \w{3} \d/, "the stats lines are gone")
     assert.equal(await cards(page).count(), 3)
     assert.equal(await page.getByRole("heading", { name: "Featured", exact: true }).count(), 0, "no featured section when nothing is featured")
@@ -347,9 +356,9 @@ describe("links", () => {
 })
 
 describe("spec + prompt button", () => {
-  test("copies the prompt, the spec and the metadata reference in one go, from the header and the hero", async () => {
+  test("copies the prompt, the spec and the metadata reference in one go, from the header", async () => {
     const { page, context } = await open(real, "", { permissions: ["clipboard-read", "clipboard-write"] })
-    for (const where of ["header", "section[aria-labelledby=hero-title]"]) {
+    for (const where of ["header"]) {
       await page.evaluate(() => navigator.clipboard.writeText("empty"))
       await page.locator(where).getByRole("button", { name: /Spec \+ prompt/ }).click()
       await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.includes("Part 3")))
