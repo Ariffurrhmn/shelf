@@ -208,11 +208,3 @@ Measured on the built site in headless Chromium (no throttling): gallery JS 94 K
 | A short link clashes | The build names both owners; set `short` on one artifact. Codes are never renumbered silently. |
 | Preview port busy | `python shelf preview --port 8001`. |
 | An old link 404s after a rename | Use `python shelf rename`; `python shelf links --compare origin/main` shows what broke. |
-
-## Roadmap
-
-See [`docs/roadmap.md`](docs/roadmap.md). Next: turn on Pages, add real artifacts (see [`docs/collection.md`](docs/collection.md)), choose a final domain.
-
-## Repository About and topics
-
-Suggested text and topics are in [`docs/collection.md`](docs/collection.md#repository-about-and-topics).
